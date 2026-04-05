@@ -55,11 +55,12 @@ type InlineSpan =
   | { type: 'bold'; text: string }
   | { type: 'italic'; text: string }
   | { type: 'code'; text: string }
+  | { type: 'link'; text: string; url: string }
 
 function parseInline(text: string): InlineSpan[] {
   const spans: InlineSpan[] = []
-  // Match **bold**, *italic*, `code`
-  const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`)/g
+  // Match **bold**, *italic*, `code`, [text](url)
+  const re = /(\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g
   let lastIndex = 0
   let match: RegExpExecArray | null
 
@@ -73,6 +74,8 @@ function parseInline(text: string): InlineSpan[] {
       spans.push({ type: 'italic', text: match[3] })
     } else if (match[4]) {
       spans.push({ type: 'code', text: match[4] })
+    } else if (match[5] && match[6]) {
+      spans.push({ type: 'link', text: match[5], url: match[6] })
     }
     lastIndex = match.index + match[0].length
   }
@@ -105,6 +108,12 @@ function InlineText({ content, isUser }: { content: string; isUser: boolean }) {
                   isUser && styles.inlineCodeUser,
                 ]}
               >
+                {span.text}
+              </Text>
+            )
+          case 'link':
+            return (
+              <Text key={i} style={[styles.link, isUser && styles.linkUser]}>
                 {span.text}
               </Text>
             )
@@ -176,5 +185,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     color: '#d4d4d4',
+  },
+  link: {
+    color: '#007AFF',
+    textDecorationLine: 'underline' as const,
+  },
+  linkUser: {
+    color: '#a0d8ff',
   },
 })

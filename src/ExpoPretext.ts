@@ -10,7 +10,7 @@ type MeasureNativeOptions = {
   locale?: string
 }
 
-interface ExpoPretextNativeModule extends NativeModule {
+interface ExpoPretextNativeModule extends InstanceType<typeof NativeModule> {
   segmentAndMeasure(
     text: string,
     font: FontDescriptor,

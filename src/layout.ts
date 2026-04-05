@@ -807,6 +807,17 @@ export function layoutWithLines(
   return { lineCount, height: lineCount * lh, lines }
 }
 
+// --- Inline-flow compatibility ---
+
+// Re-export the public PreparedTextWithSegments under the alias the inline-flow
+// module expects.  The underlying type is the same opaque branded handle.
+export type { PublicPreparedTextWithSegments as PreparedTextWithSegments }
+export type { LayoutCursor, LayoutResult, LayoutLineRange, LayoutLine }
+
+// prepareWithSegments is now provided by prepare.ts, which wires the full
+// pipeline: native segmentation + measurement → analysis → buildPreparedTextWithSegments.
+// Import from './prepare.js' instead of layout.js for this function.
+
 // --- Cache management ---
 
 export function clearCache(): void {

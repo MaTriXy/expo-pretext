@@ -1,20 +1,36 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
-import { View, Text, StyleSheet, useWindowDimensions, TextInput, Pressable } from 'react-native'
-
-import { chatTheme } from '../../data/chat-theme'
+import { useState, useCallback } from 'react'
+import { View, Text, StyleSheet, useWindowDimensions, Pressable, ScrollView } from 'react-native'
+import { FlashList } from '@shopify/flash-list'
 import { mockMessages, mockStreamTokens, type ChatMessage } from '../../data/mock-messages'
 import { markdownSample } from '../../data/sample-texts'
+import { useTextHeight } from 'expo-pretext'
 
-// TODO: Replace with expo-pretext imports once dev build is ready
-// import { useTextHeight, useFlashListHeights } from 'expo-pretext'
+const textStyle = { fontFamily: 'System', fontSize: 16, lineHeight: 24 }
+
+function ChatBubble({ message, maxWidth }: { message: ChatMessage; maxWidth: number }) {
+  const predictedHeight = useTextHeight(message.content, textStyle, maxWidth)
+
+  return (
+    <View
+      style={[
+        styles.bubble,
+        message.role === 'user' ? styles.userBubble : styles.assistantBubble,
+      ]}
+    >
+      <Text style={styles.messageText}>{message.content}</Text>
+      {message.reactions && (
+        <Text style={styles.reactions}>{message.reactions.join(' ')}</Text>
+      )}
+    </View>
+  )
+}
 
 export default function ChatScreen() {
   const { width } = useWindowDimensions()
-  const bubbleWidth = width - chatTheme.screenPadding * 2 - chatTheme.avatarSize - chatTheme.avatarGap
-  const [messages, setMessages] = useState<ChatMessage[]>(mockMessages.slice(0, 20))
+  const bubbleMaxWidth = width * 0.75
+  const [messages] = useState<ChatMessage[]>(mockMessages)
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
-  const [mode, setMode] = useState<'pretext' | 'onlayout'>('pretext')
 
   const startStreaming = useCallback(async () => {
     if (isStreaming) return
@@ -23,67 +39,39 @@ export default function ChatScreen() {
     for await (const text of stream) {
       setStreamingText(text)
     }
-    setMessages(prev => [
-      ...prev,
-      {
-        id: String(Date.now()),
-        role: 'assistant',
-        content: markdownSample,
-        timestamp: Date.now(),
-        status: 'complete',
-      },
-    ])
     setStreamingText('')
     setIsStreaming(false)
   }, [isStreaming])
 
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatMessage }) => (
+      <ChatBubble message={item} maxWidth={bubbleMaxWidth} />
+    ),
+    [bubbleMaxWidth]
+  )
+
   return (
     <View style={styles.container}>
-      {/* Mode toggle */}
-      <View style={styles.toggleRow}>
-        <Pressable
-          style={[styles.toggleBtn, mode === 'pretext' && styles.toggleActive]}
-          onPress={() => setMode('pretext')}
-        >
-          <Text style={[styles.toggleText, mode === 'pretext' && styles.toggleTextActive]}>
-            expo-pretext
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.toggleBtn, mode === 'onlayout' && styles.toggleActive]}
-          onPress={() => setMode('onlayout')}
-        >
-          <Text style={[styles.toggleText, mode === 'onlayout' && styles.toggleTextActive]}>
-            onLayout
-          </Text>
-        </Pressable>
+      <View style={styles.header}>
+        <Text style={styles.headerText}>
+          {messages.length} messages | FlashList + expo-pretext
+        </Text>
       </View>
 
-      {/* Messages */}
-      <View style={styles.messageList}>
-        {messages.slice(-10).map(msg => (
-          <View
-            key={msg.id}
-            style={[
-              styles.bubble,
-              msg.role === 'user' ? styles.userBubble : styles.assistantBubble,
-            ]}
-          >
-            <Text style={styles.messageText}>{msg.content}</Text>
-            {msg.reactions && (
-              <Text style={styles.reactions}>{msg.reactions.join(' ')}</Text>
-            )}
-          </View>
-        ))}
-        {streamingText !== '' && (
-          <View style={[styles.bubble, styles.assistantBubble]}>
-            <Text style={styles.messageText}>{streamingText}</Text>
-            <View style={styles.cursor} />
-          </View>
-        )}
-      </View>
+      <FlashList
+        data={messages}
+        renderItem={renderMessage}
+        estimatedItemSize={80}
+        keyExtractor={msg => msg.id}
+      />
 
-      {/* Stream button */}
+      {streamingText !== '' && (
+        <View style={[styles.bubble, styles.assistantBubble, styles.streamingBubble]}>
+          <Text style={styles.messageText}>{streamingText}</Text>
+          <View style={styles.cursor} />
+        </View>
+      )}
+
       <Pressable style={styles.streamBtn} onPress={startStreaming} disabled={isStreaming}>
         <Text style={styles.streamBtnText}>
           {isStreaming ? 'Streaming...' : 'Simulate AI Response'}
@@ -95,26 +83,18 @@ export default function ChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  toggleRow: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 8,
-    justifyContent: 'center',
-  },
-  toggleBtn: {
+  header: {
+    paddingVertical: 6,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#e8e8e8',
   },
-  toggleActive: { backgroundColor: '#007AFF' },
-  toggleText: { fontSize: 14, color: '#333' },
-  toggleTextActive: { color: '#fff', fontWeight: '600' },
-  messageList: { flex: 1, padding: 16, gap: 8 },
+  headerText: { fontSize: 12, color: '#666', textAlign: 'center' },
   bubble: {
     padding: 12,
     borderRadius: 16,
     maxWidth: '80%',
+    marginBottom: 8,
+    marginHorizontal: 16,
   },
   userBubble: {
     backgroundColor: '#007AFF',
@@ -125,10 +105,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     alignSelf: 'flex-start',
     borderBottomLeftRadius: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+  },
+  streamingBubble: {
+    position: 'absolute',
+    bottom: 80,
+    left: 0,
   },
   messageText: { fontSize: 16, lineHeight: 24 },
   reactions: { fontSize: 14, marginTop: 4 },

@@ -104,7 +104,6 @@ const styles = StyleSheet.create({
     padding: 4,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#ddd',
-    flex: 1,
   },
   sampleText: { fontSize: 16, lineHeight: 24 },
   resultCol: { width: 55, alignItems: 'center', paddingTop: 2 },

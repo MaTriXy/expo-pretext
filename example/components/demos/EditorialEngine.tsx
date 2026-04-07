@@ -1,245 +1,175 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, useWindowDimensions, PanResponder, Pressable } from 'react-native'
 import { prepareWithSegments, layoutNextLine } from 'expo-pretext'
 
 const textStyle = { fontFamily: 'Helvetica Neue', fontSize: 13, lineHeight: 18 }
-const lineHeight = 18
+const LH = 18
 
-const articleText = `Pretext measures and lays out multiline text entirely through arithmetic. No getBoundingClientRect, no reflow, no layout thrashing. The glowing orbs on this panel are circular obstacles. For every line of text, the engine checks whether the line intersects each orb, computes the blocked interval, and subtracts it from the available width. Text flows on both sides simultaneously — something CSS Shapes cannot do. All of this runs without a single DOM measurement. Drag the orbs to see text reflow in real time. The web renders text through a pipeline designed thirty years ago for static documents. A browser loads a font, shapes text into glyphs, measures their combined width, determines where lines break, and positions each line vertically. Every step requires the rendering engine to consult its internal layout tree — a structure so expensive that browsers guard access behind synchronous reflow barriers. Pretext sidesteps this entirely. It measures every word once via canvas and caches the widths. After preparation, layout is pure arithmetic: walk cached widths, track running line width, insert breaks when width exceeds maximum, sum line heights. No DOM. No reflow. Zero layout tree access.`
+const articleText = `Pretext measures and lays out multiline text entirely through arithmetic. No getBoundingClientRect, no reflow, no layout thrashing. The glowing orbs on this panel are circular obstacles. For every line of text, the engine checks whether the line intersects each orb, computes the blocked interval, and subtracts it from the available width. Text flows on both sides simultaneously — something CSS Shapes cannot do. All of this runs without a single DOM measurement. Drag the orbs to see text reflow in real time. The web renders text through a pipeline designed thirty years ago for static documents. A browser loads a font, shapes text into glyphs, measures their combined width, determines where lines break, and positions each line vertically. Every step requires the rendering engine to consult its internal layout tree — a structure so expensive that browsers guard access behind synchronous reflow barriers. Pretext sidesteps this entirely. It measures every word once via canvas and caches the widths. After preparation, layout is pure arithmetic: walk cached widths, track running line width, insert breaks when width exceeds maximum, sum line heights. No DOM. No reflow. Zero layout tree access. Each individual bears a coat of irregular brown patches separated by pale lines, a pattern as unique as a fingerprint.`
 
 type Orb = {
-  x: number
-  y: number
-  vx: number
-  vy: number
-  radius: number
-  color: string
-  glowColor: string
+  x: number; y: number; vx: number; vy: number
+  radius: number; color: string; glowColor: string
 }
 
-function getCircleBlockedInterval(
-  orbX: number, orbY: number, orbRadius: number,
-  lineY: number, lineH: number
-): { left: number; right: number } | null {
-  // Check if line overlaps with circle vertically
-  const lineMid = lineY + lineH / 2
-  const dy = Math.abs(lineMid - orbY)
-  if (dy >= orbRadius) return null
+type LineSpan = { text: string; x: number; y: number; width: number }
 
-  // Horizontal interval blocked by circle at this Y
-  const halfChord = Math.sqrt(orbRadius * orbRadius - dy * dy)
-  return {
-    left: orbX - halfChord,
-    right: orbX + halfChord,
+function circleBlockAt(ox: number, oy: number, r: number, lineY: number): { left: number; right: number } | null {
+  const dy = Math.abs(lineY + LH / 2 - oy)
+  if (dy >= r) return null
+  const half = Math.sqrt(r * r - dy * dy)
+  return { left: ox - half, right: ox + half }
+}
+
+// Merge overlapping intervals
+function mergeIntervals(ivs: { left: number; right: number }[]): { left: number; right: number }[] {
+  if (ivs.length === 0) return []
+  ivs.sort((a, b) => a.left - b.left)
+  const merged = [ivs[0]!]
+  for (let i = 1; i < ivs.length; i++) {
+    const prev = merged[merged.length - 1]!
+    const cur = ivs[i]!
+    if (cur.left <= prev.right) {
+      prev.right = Math.max(prev.right, cur.right)
+    } else {
+      merged.push(cur)
+    }
   }
+  return merged
+}
+
+// Get free spans on a line after subtracting blocked intervals
+function getFreeSpans(blocked: { left: number; right: number }[], totalWidth: number): { start: number; width: number }[] {
+  const merged = mergeIntervals(blocked)
+  const spans: { start: number; width: number }[] = []
+  let pos = 0
+  for (const iv of merged) {
+    const clampedLeft = Math.max(0, iv.left)
+    if (clampedLeft > pos) {
+      spans.push({ start: pos, width: clampedLeft - pos })
+    }
+    pos = Math.max(pos, Math.min(totalWidth, iv.right))
+  }
+  if (pos < totalWidth) {
+    spans.push({ start: pos, width: totalWidth - pos })
+  }
+  return spans.filter(s => s.width > 20)
 }
 
 export function EditorialEngineDemo() {
   const { width } = useWindowDimensions()
-  const columnWidth = width - 48
-  const columnHeight = 500
+  const colW = width - 48
+  const colH = 520
   const [paused, setPaused] = useState(false)
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
 
   const [orbs, setOrbs] = useState<Orb[]>([
-    { x: columnWidth * 0.65, y: 80, vx: 0.3, vy: 0.5, radius: 45, color: '#FF6B3520', glowColor: '#FF6B35' },
-    { x: columnWidth * 0.3, y: 220, vx: -0.4, vy: 0.3, radius: 35, color: '#4CAF5020', glowColor: '#4CAF50' },
-    { x: columnWidth * 0.5, y: 350, vx: 0.2, vy: -0.4, radius: 40, color: '#2196F320', glowColor: '#2196F3' },
+    { x: colW * 0.6, y: 90, vx: 0.4, vy: 0.6, radius: 50, color: '#FF6B3518', glowColor: '#FF6B35' },
+    { x: colW * 0.25, y: 260, vx: -0.3, vy: 0.4, radius: 40, color: '#4CAF5018', glowColor: '#4CAF50' },
+    { x: colW * 0.7, y: 380, vx: 0.2, vy: -0.5, radius: 45, color: '#2196F318', glowColor: '#2196F3' },
   ])
 
-  // Physics animation
   useEffect(() => {
     if (paused) return
-    const interval = setInterval(() => {
-      setOrbs(prev => prev.map((orb, i) => {
-        if (i === dragIndex) return orb
-        let { x, y, vx, vy } = orb
-        x += vx
-        y += vy
-        // Bounce off walls
-        if (x - orb.radius < 0 || x + orb.radius > columnWidth) vx = -vx
-        if (y - orb.radius < 0 || y + orb.radius > columnHeight) vy = -vy
-        x = Math.max(orb.radius, Math.min(columnWidth - orb.radius, x))
-        y = Math.max(orb.radius, Math.min(columnHeight - orb.radius, y))
-        return { ...orb, x, y, vx, vy }
+    const iv = setInterval(() => {
+      setOrbs(prev => prev.map((o, i) => {
+        if (i === dragIdx) return o
+        let { x, y, vx, vy } = o
+        x += vx; y += vy
+        if (x - o.radius < 0 || x + o.radius > colW) vx = -vx
+        if (y - o.radius < 0 || y + o.radius > colH) vy = -vy
+        return { ...o, x: Math.max(o.radius, Math.min(colW - o.radius, x)), y: Math.max(o.radius, Math.min(colH - o.radius, y)), vx, vy }
       }))
-    }, 32) // ~30fps physics
-    return () => clearInterval(interval)
-  }, [paused, dragIndex, columnWidth, columnHeight])
+    }, 33)
+    return () => clearInterval(iv)
+  }, [paused, dragIdx, colW, colH])
 
-  // Pan responder for dragging orbs
-  const panResponder = useMemo(() =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const { locationX, locationY } = evt.nativeEvent
-        // Find which orb was touched
-        const idx = orbs.findIndex(orb => {
-          const dx = locationX - orb.x
-          const dy = locationY - orb.y
-          return Math.sqrt(dx * dx + dy * dy) < orb.radius + 20
-        })
-        setDragIndex(idx >= 0 ? idx : null)
-      },
-      onPanResponderMove: (evt) => {
-        if (dragIndex === null) return
-        const { locationX, locationY } = evt.nativeEvent
-        setOrbs(prev => prev.map((orb, i) =>
-          i === dragIndex
-            ? { ...orb, x: Math.max(orb.radius, Math.min(columnWidth - orb.radius, locationX)), y: Math.max(orb.radius, Math.min(columnHeight - orb.radius, locationY)) }
-            : orb
-        ))
-      },
-      onPanResponderRelease: () => setDragIndex(null),
-    }),
-  [dragIndex, columnWidth, columnHeight, orbs])
+  const pan = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderGrant: (e) => {
+      const { locationX: lx, locationY: ly } = e.nativeEvent
+      const idx = orbs.findIndex(o => Math.hypot(lx - o.x, ly - o.y) < o.radius + 15)
+      setDragIdx(idx >= 0 ? idx : null)
+    },
+    onPanResponderMove: (e) => {
+      if (dragIdx === null) return
+      const { locationX: lx, locationY: ly } = e.nativeEvent
+      setOrbs(prev => prev.map((o, i) => i === dragIdx ? { ...o, x: Math.max(o.radius, Math.min(colW - o.radius, lx)), y: Math.max(o.radius, Math.min(colH - o.radius, ly)) } : o))
+    },
+    onPanResponderRelease: () => setDragIdx(null),
+  }), [dragIdx, colW, colH, orbs])
 
-  // layoutNextLine with circular obstacles — text flows on BOTH sides
-  const lines = useMemo(() => {
+  // TEXT REFLOW: layoutNextLine across multiple free spans per line
+  const spans = useMemo(() => {
     const prepared = prepareWithSegments(articleText, textStyle)
-    const result: { text: string; x: number; y: number; width: number }[] = []
-
+    const result: LineSpan[] = []
     let cursor = { segmentIndex: 0, graphemeIndex: 0 }
     let y = 0
+    let done = false
 
-    while (y < columnHeight) {
-      // Find all blocked intervals on this line
-      const intervals: { left: number; right: number }[] = []
-      for (const orb of orbs) {
-        const blocked = getCircleBlockedInterval(orb.x, orb.y, orb.radius + 6, y, lineHeight)
-        if (blocked) intervals.push(blocked)
+    while (y < colH && !done) {
+      // Blocked intervals from all orbs at this Y
+      const blocked: { left: number; right: number }[] = []
+      for (const o of orbs) {
+        const b = circleBlockAt(o.x, o.y, o.radius + 8, y)
+        if (b) blocked.push(b)
       }
 
-      // Sort intervals and find the widest free span
-      intervals.sort((a, b) => a.left - b.left)
+      const freeSpans = getFreeSpans(blocked, colW)
 
-      // Find available spans
-      let bestSpan = { start: 0, width: columnWidth }
-      if (intervals.length > 0) {
-        const spans: { start: number; width: number }[] = []
-        let freeStart = 0
-        for (const iv of intervals) {
-          if (iv.left > freeStart) {
-            spans.push({ start: freeStart, width: iv.left - freeStart })
-          }
-          freeStart = Math.max(freeStart, iv.right)
-        }
-        if (freeStart < columnWidth) {
-          spans.push({ start: freeStart, width: columnWidth - freeStart })
-        }
-        // Use widest span
-        bestSpan = spans.reduce((a, b) => b.width > a.width ? b : a, { start: 0, width: 0 })
-      }
-
-      if (bestSpan.width < 30) {
-        y += lineHeight
+      if (freeSpans.length === 0) {
+        y += LH
         continue
       }
 
-      const line = layoutNextLine(prepared, cursor, bestSpan.width)
-      if (!line) break
+      // Fill each free span with text from the same cursor
+      for (const span of freeSpans) {
+        if (done) break
+        const line = layoutNextLine(prepared, cursor, span.width)
+        if (!line) { done = true; break }
+        result.push({ text: line.text, x: span.start, y, width: span.width })
+        cursor = line.end
+      }
 
-      result.push({ text: line.text, x: bestSpan.start, y, width: bestSpan.width })
-      cursor = line.end
-      y += lineHeight
+      y += LH
     }
 
     return result
-  }, [orbs, columnWidth, columnHeight])
+  }, [orbs, colW, colH])
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Editorial Engine</Text>
+        <Text style={styles.title}>Editorial Engine</Text>
         <Pressable onPress={() => setPaused(!paused)}>
           <Text style={styles.pauseBtn}>{paused ? '▶ Resume' : '⏸ Pause'}</Text>
         </Pressable>
       </View>
-      <Text style={styles.subtitle}>
-        Drag orbs · {paused ? 'Paused' : 'Physics running'} · Zero native calls per frame
-      </Text>
+      <Text style={styles.sub}>Drag orbs · Text flows on BOTH sides · 0 native calls per frame</Text>
 
-      <View
-        {...panResponder.panHandlers}
-        style={[styles.textArea, { width: columnWidth, height: columnHeight }]}
-      >
-        {/* Text lines */}
-        {lines.map((line, i) => (
-          <Text
-            key={i}
-            style={[
-              styles.lineText,
-              { position: 'absolute', top: line.y, left: line.x, width: line.width },
-            ]}
-            numberOfLines={1}
-          >
-            {line.text}
+      <View {...pan.panHandlers} style={[styles.area, { width: colW, height: colH }]}>
+        {spans.map((s, i) => (
+          <Text key={i} style={[styles.line, { position: 'absolute', top: s.y, left: s.x, width: s.width }]} numberOfLines={1}>
+            {s.text}
           </Text>
         ))}
-
-        {/* Orbs */}
-        {orbs.map((orb, i) => (
-          <View
-            key={i}
-            style={[
-              styles.orb,
-              {
-                position: 'absolute',
-                left: orb.x - orb.radius,
-                top: orb.y - orb.radius,
-                width: orb.radius * 2,
-                height: orb.radius * 2,
-                borderRadius: orb.radius,
-                backgroundColor: orb.color,
-                borderColor: orb.glowColor,
-                shadowColor: orb.glowColor,
-              },
-            ]}
-          />
+        {orbs.map((o, i) => (
+          <View key={i} style={[styles.orb, { position: 'absolute', left: o.x - o.radius, top: o.y - o.radius, width: o.radius * 2, height: o.radius * 2, borderRadius: o.radius, backgroundColor: o.color, borderColor: o.glowColor, shadowColor: o.glowColor }]} />
         ))}
       </View>
-
-      <Text style={styles.stats}>
-        {lines.length} lines · prepareWithSegments() once · layoutNextLine() ×{lines.length} per frame
-      </Text>
+      <Text style={styles.stats}>{spans.length} spans · prepareWithSegments() once · layoutNextLine() ×{spans.length}/frame</Text>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 8 },
+  title: { fontSize: 18, fontWeight: '700' },
   pauseBtn: { fontSize: 13, color: '#007AFF', fontWeight: '600' },
-  subtitle: {
-    fontSize: 11, color: '#999', paddingHorizontal: 16, marginBottom: 8,
-  },
-  textArea: {
-    marginHorizontal: 16,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 12,
-    overflow: 'hidden',
-  },
-  lineText: {
-    fontFamily: 'Helvetica Neue',
-    fontSize: 13,
-    lineHeight: 18,
-    color: '#d4d4d4',
-  },
-  orb: {
-    borderWidth: 2,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 20,
-  },
-  stats: {
-    fontSize: 11, color: '#999', textAlign: 'center', marginTop: 8, fontFamily: 'Menlo',
-  },
+  sub: { fontSize: 11, color: '#999', paddingHorizontal: 16, marginBottom: 8 },
+  area: { marginHorizontal: 16, backgroundColor: '#1a1a1a', borderRadius: 12, padding: 8, overflow: 'hidden' },
+  line: { fontFamily: 'Helvetica Neue', fontSize: 13, lineHeight: 18, color: '#d4d4d4' },
+  orb: { borderWidth: 1.5, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.7, shadowRadius: 25 },
+  stats: { fontSize: 10, color: '#999', textAlign: 'center', marginTop: 6, fontFamily: 'Menlo' },
 })

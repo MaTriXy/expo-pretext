@@ -33,5 +33,21 @@ export { layout, layoutWithLines, layoutNextLine, walkLineRanges, measureNatural
 // --- Rich Inline (formerly inline-flow) ---
 export { prepareInlineFlow, walkInlineFlowLines, measureInlineFlow } from './rich-inline'
 
+// --- Obstacle Layout ---
+export {
+  carveTextLineSlots,
+  circleIntervalForBand,
+  rectIntervalForBand,
+  layoutColumn,
+} from './obstacle-layout'
+export type {
+  Interval,
+  CircleObstacle,
+  RectObstacle,
+  LayoutRegion,
+  PositionedLine,
+  LayoutColumnResult,
+} from './obstacle-layout'
+
 // --- Utilities ---
 export { clearCache, setLocale } from './layout'

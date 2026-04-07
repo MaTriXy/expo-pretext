@@ -1,6 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { View, Text, StyleSheet, useWindowDimensions, PanResponder, Pressable } from 'react-native'
-import { prepareWithSegments, layoutNextLine } from 'expo-pretext'
+import {
+  prepareWithSegments,
+  layoutColumn,
+  type CircleObstacle,
+  type PositionedLine,
+} from 'expo-pretext'
 
 const textStyle = { fontFamily: 'Helvetica Neue', fontSize: 13, lineHeight: 18 }
 const LH = 18
@@ -10,50 +15,6 @@ const articleText = `Pretext measures and lays out multiline text entirely throu
 type Orb = {
   x: number; y: number; vx: number; vy: number
   radius: number; color: string; glowColor: string
-}
-
-type LineSpan = { text: string; x: number; y: number; width: number }
-
-function circleBlockAt(ox: number, oy: number, r: number, lineY: number): { left: number; right: number } | null {
-  const dy = Math.abs(lineY + LH / 2 - oy)
-  if (dy >= r) return null
-  const half = Math.sqrt(r * r - dy * dy)
-  return { left: ox - half, right: ox + half }
-}
-
-// Merge overlapping intervals
-function mergeIntervals(ivs: { left: number; right: number }[]): { left: number; right: number }[] {
-  if (ivs.length === 0) return []
-  ivs.sort((a, b) => a.left - b.left)
-  const merged = [ivs[0]!]
-  for (let i = 1; i < ivs.length; i++) {
-    const prev = merged[merged.length - 1]!
-    const cur = ivs[i]!
-    if (cur.left <= prev.right) {
-      prev.right = Math.max(prev.right, cur.right)
-    } else {
-      merged.push(cur)
-    }
-  }
-  return merged
-}
-
-// Get free spans on a line after subtracting blocked intervals
-function getFreeSpans(blocked: { left: number; right: number }[], totalWidth: number): { start: number; width: number }[] {
-  const merged = mergeIntervals(blocked)
-  const spans: { start: number; width: number }[] = []
-  let pos = 0
-  for (const iv of merged) {
-    const clampedLeft = Math.max(0, iv.left)
-    if (clampedLeft > pos) {
-      spans.push({ start: pos, width: clampedLeft - pos })
-    }
-    pos = Math.max(pos, Math.min(totalWidth, iv.right))
-  }
-  if (pos < totalWidth) {
-    spans.push({ start: pos, width: totalWidth - pos })
-  }
-  return spans.filter(s => s.width > 20)
 }
 
 export function EditorialEngineDemo() {
@@ -69,6 +30,7 @@ export function EditorialEngineDemo() {
     { x: colW * 0.7, y: 380, vx: 0.2, vy: -0.5, radius: 45, color: '#2196F318', glowColor: '#2196F3' },
   ])
 
+  // Physics
   useEffect(() => {
     if (paused) return
     const iv = setInterval(() => {
@@ -84,6 +46,7 @@ export function EditorialEngineDemo() {
     return () => clearInterval(iv)
   }, [paused, dragIdx, colW, colH])
 
+  // Drag
   const pan = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onPanResponderGrant: (e) => {
@@ -99,42 +62,20 @@ export function EditorialEngineDemo() {
     onPanResponderRelease: () => setDragIdx(null),
   }), [dragIdx, colW, colH, orbs])
 
-  // TEXT REFLOW: layoutNextLine across multiple free spans per line
-  const spans = useMemo(() => {
+  // Layout — using layoutColumn from expo-pretext!
+  const lines = useMemo(() => {
     const prepared = prepareWithSegments(articleText, textStyle)
-    const result: LineSpan[] = []
-    let cursor = { segmentIndex: 0, graphemeIndex: 0 }
-    let y = 0
-    let done = false
-
-    while (y < colH && !done) {
-      // Blocked intervals from all orbs at this Y
-      const blocked: { left: number; right: number }[] = []
-      for (const o of orbs) {
-        const b = circleBlockAt(o.x, o.y, o.radius + 8, y)
-        if (b) blocked.push(b)
-      }
-
-      const freeSpans = getFreeSpans(blocked, colW)
-
-      if (freeSpans.length === 0) {
-        y += LH
-        continue
-      }
-
-      // Fill each free span with text from the same cursor
-      for (const span of freeSpans) {
-        if (done) break
-        const line = layoutNextLine(prepared, cursor, span.width)
-        if (!line) { done = true; break }
-        result.push({ text: line.text, x: span.start, y, width: span.width })
-        cursor = line.end
-      }
-
-      y += LH
-    }
-
-    return result
+    const obstacles: CircleObstacle[] = orbs.map(o => ({
+      cx: o.x, cy: o.y, r: o.radius, hPad: 8, vPad: 2,
+    }))
+    const { lines } = layoutColumn(
+      prepared,
+      { segmentIndex: 0, graphemeIndex: 0 },
+      { x: 0, y: 0, width: colW, height: colH },
+      LH,
+      obstacles,
+    )
+    return lines
   }, [orbs, colW, colH])
 
   return (
@@ -148,7 +89,7 @@ export function EditorialEngineDemo() {
       <Text style={styles.sub}>Drag orbs · Text flows on BOTH sides · 0 native calls per frame</Text>
 
       <View {...pan.panHandlers} style={[styles.area, { width: colW, height: colH }]}>
-        {spans.map((s, i) => (
+        {lines.map((s, i) => (
           <Text key={i} style={[styles.line, { position: 'absolute', top: s.y, left: s.x, width: s.width }]} numberOfLines={1}>
             {s.text}
           </Text>
@@ -157,7 +98,7 @@ export function EditorialEngineDemo() {
           <View key={i} style={[styles.orb, { position: 'absolute', left: o.x - o.radius, top: o.y - o.radius, width: o.radius * 2, height: o.radius * 2, borderRadius: o.radius, backgroundColor: o.color, borderColor: o.glowColor, shadowColor: o.glowColor }]} />
         ))}
       </View>
-      <Text style={styles.stats}>{spans.length} spans · prepareWithSegments() once · layoutNextLine() ×{spans.length}/frame</Text>
+      <Text style={styles.stats}>{lines.length} spans · layoutColumn() from expo-pretext</Text>
     </View>
   )
 }

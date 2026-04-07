@@ -7,6 +7,9 @@ import { AccordionDemo } from '../../components/demos/Accordion'
 import { EditorialEngineDemo } from '../../components/demos/EditorialEngine'
 import { MasonryDemo } from '../../components/demos/Masonry'
 import { I18nDemo } from '../../components/demos/I18n'
+import { MarkdownChatDemo } from '../../components/demos/MarkdownChat'
+import { JustificationComparisonDemo } from '../../components/demos/JustificationComparison'
+import { AsciiArtDemo } from '../../components/demos/AsciiArt'
 
 const demos = [
   {
@@ -48,6 +51,30 @@ const demos = [
     level: 'Beginner',
     desc: 'CJK, Arabic, Georgian, Thai — same API, no locale hacks',
     component: I18nDemo,
+  },
+  {
+    id: 'markdown-chat',
+    title: 'Markdown Chat',
+    api: 'useFlashListHeights() + tight-wrap',
+    level: 'Intermediate',
+    desc: '500 messages, FlashList virtualized, tight-wrapped bubbles with binary search',
+    component: MarkdownChatDemo,
+  },
+  {
+    id: 'justification',
+    title: 'Justification Comparison',
+    api: 'layoutWithLines()',
+    level: 'Intermediate',
+    desc: 'Left-aligned vs justified text — same prepare(), custom line rendering',
+    component: JustificationComparisonDemo,
+  },
+  {
+    id: 'ascii-art',
+    title: 'Typographic ASCII Art',
+    api: 'prepareWithSegments() + layoutWithLines()',
+    level: 'Intermediate',
+    desc: 'Character-level width measurement — monospace vs proportional font comparison',
+    component: AsciiArtDemo,
   },
 ]
 

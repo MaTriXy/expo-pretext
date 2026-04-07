@@ -4,9 +4,10 @@ import { sampleTexts } from '../../data/sample-texts'
 import { useTextHeight } from 'expo-pretext'
 
 const testWidths = [200, 280, 360]
-// Note: 'System' font is unsafe for accuracy (SF Pro Text vs Display mismatch)
-// Use explicit font name for reliable measurement
-const textStyleConfig = { fontFamily: 'Helvetica Neue', fontSize: 16, lineHeight: 24 }
+// Use default system font — iOS resolves correct script-specific fonts
+// (Georgian, CJK, Arabic, etc.) automatically. Named fonts like 'Helvetica Neue'
+// trigger font substitution for non-Latin scripts which causes measurement mismatch.
+const textStyleConfig = { fontFamily: 'System', fontSize: 16, lineHeight: 24 }
 
 function AccuracyRow({ text, testWidth }: { text: string; testWidth: number }) {
   const [actual, setActual] = useState<number | null>(null)
@@ -120,5 +121,5 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     alignSelf: 'flex-start',
   },
-  sampleText: { fontFamily: 'Helvetica Neue', fontSize: 16, lineHeight: 24 },
+  sampleText: { fontSize: 16, lineHeight: 24 },
 })

@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.3.0 — 2026-04-08
+
+### Performance
+
+Port of 8 upstream fixes from chenglou/pretext v0.0.5 addressing O(n^2) → O(n) regressions:
+
+- Structural punctuation merge tracker — O(1) per merge instead of re-scanning
+- Deferred punctuation materialization — `ch.repeat(n)` at flush instead of incremental concat
+- CJK keep-all merges linear — deferred-join with cached containsCJK/canContinue flags
+- Arabic no-space merges linear — per-slot metadata tracking arrays replace re-scanning
+- Prepare worst-case linear — reverse-pass forward-sticky carry, cached CJK unit flags
+- Breakable runs unified — `breakableWidths` + `breakablePrefixWidths` → single `breakableFitAdvances`
+- Pre-wrap fast-path — remove no-op string replace
+
+### Added
+
+- `prepareStreaming()` and `clearStreamingState()` exported for power users (streaming without hooks)
+- Performance regression tests for analysis module (repeated punctuation, CJK, Arabic)
+
+### Architecture
+
+- Extracted `build.ts` from `layout.ts` (852 → 353 + 503 lines)
+- Removed `as any` casts in rich-inline.ts — typed `PreparedLineBreakData` bridge
+- Consolidated duplicate types between `types.ts` and `rich-inline.ts`
+- Renamed `getLineHeight` → `resolveLineHeight` in layout.ts to fix naming collision
+
+### Tests
+
+- 111 automated tests (was 106)
+
 ## 0.2.0 — 2026-04-08
 
 ### Added

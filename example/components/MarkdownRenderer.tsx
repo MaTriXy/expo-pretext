@@ -183,10 +183,23 @@ const RenderBlock = memo(function RenderBlock({
         <View>
           {block.items.map((item, idx) => (
             <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: idx > 0 ? 4 : 0 }}>
-              <Text style={{ fontFamily: 'Menlo', fontSize: 11, fontWeight: '600', width: LIST_INDENT, lineHeight: 22, color: '#999' }}>
-                {item.checked === true ? '\u2611' : item.checked === false ? '\u2610' :
-                  block.ordered ? `${idx + 1}.` : '\u2022'}
-              </Text>
+              {item.checked !== undefined ? (
+                <View style={{ width: LIST_INDENT + 4, paddingTop: 4, alignItems: 'center' }}>
+                  <View style={{
+                    width: 16, height: 16, borderRadius: 4,
+                    borderWidth: item.checked ? 0 : 1.5,
+                    borderColor: '#ccc',
+                    backgroundColor: item.checked ? theme.checkboxColor : 'transparent',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {item.checked && <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', lineHeight: 14 }}>{'\u2713'}</Text>}
+                  </View>
+                </View>
+              ) : (
+                <Text style={{ fontFamily: 'Menlo', fontSize: 11, fontWeight: '600', width: LIST_INDENT, lineHeight: 22, color: '#999' }}>
+                  {block.ordered ? `${idx + 1}.` : '\u2022'}
+                </Text>
+              )}
               <View style={{ flex: 1 }}>
                 {item.blocks.map((b, i) => (
                   <View key={i} style={i > 0 ? { marginTop: 4 } : undefined}>

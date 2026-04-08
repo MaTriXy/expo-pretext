@@ -39,7 +39,7 @@ function AccordionSection({ title, content, maxWidth }: { title: string; content
         <Text style={styles.chevron}>{expanded ? '▲' : '▼'}</Text>
       </Pressable>
       {expanded && (
-        <View style={[styles.body, { height: contentHeight + 24 }]}>
+        <View style={styles.body}>
           <Text style={styles.bodyText}>{content}</Text>
         </View>
       )}

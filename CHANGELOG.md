@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 — 2026-04-09
+
+### Tests
+
+- **220 automated tests** (was 111) — comprehensive coverage for all core modules:
+  - `line-break.ts`: 38 tests (wrapping, overflow, spaces, walk, step)
+  - `streaming.ts`: 24 tests (append detection, cache, multi-key, rapid tokens)
+  - `rich-inline.ts`: 25 tests (atomic, extraWidth, mixed fonts, fragments)
+  - `hooks.ts`: 22 tests (prepare+layout pipeline, batch, segments, natural width)
+
 ## 0.3.0 — 2026-04-08
 
 ### Performance

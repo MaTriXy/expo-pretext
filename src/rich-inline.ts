@@ -27,11 +27,16 @@ import {
   stepPreparedLineGeometry as stepPreparedLineGeometryRaw,
 } from './line-break'
 
+import type { PreparedLineBreakData } from './line-break'
+
 // The opaque PreparedTextWithSegments is structurally compatible with
 // PreparedLineBreakData at runtime, but TypeScript's branded types hide that.
-// These wrappers bridge the gap without exposing internals.
-const stepPreparedLineRange = stepPreparedLineRangeRaw as (prepared: any, start: any, maxWidth: number) => any
-const stepPreparedLineGeometry = stepPreparedLineGeometryRaw as (prepared: any, start: any, maxWidth: number) => any
+// Cast through the internal type instead of `any` so the boundary is typed.
+const asPrepared = (p: PreparedTextWithSegments) => p as unknown as PreparedLineBreakData
+const stepPreparedLineRange = (prepared: PreparedTextWithSegments, start: LineBreakCursor, maxWidth: number) =>
+  stepPreparedLineRangeRaw(asPrepared(prepared), start, maxWidth)
+const stepPreparedLineGeometry = (prepared: PreparedTextWithSegments, start: LineBreakCursor, maxWidth: number) =>
+  stepPreparedLineGeometryRaw(asPrepared(prepared), start, maxWidth)
 import type {
   TextStyle,
   InlineFlowItem,

@@ -36,6 +36,12 @@ export function parseMarkdown(md: string): MdBlock[] {
 
 export function clearParseCache() { parseCache.clear() }
 
+function extractTaskCheck(text: string): { checked?: boolean; content: string } {
+  if (text.startsWith('[ ] ')) return { checked: false, content: text.slice(4) }
+  if (text.startsWith('[x] ') || text.startsWith('[X] ')) return { checked: true, content: text.slice(4) }
+  return { content: text }
+}
+
 function parseBlocks(md: string): MdBlock[] {
   const lines = md.split('\n')
   const blocks: MdBlock[] = []
@@ -77,7 +83,73 @@ function parseBlocks(md: string): MdBlock[] {
       continue
     }
 
-    // (blockquotes, lists, tables, images — added in later tasks)
+    // Blockquote
+    if (line.startsWith('>')) {
+      const qLines: string[] = []
+      while (i < lines.length && (lines[i]!.startsWith('>') || lines[i]!.trim() === '')) {
+        if (lines[i]!.startsWith('>')) {
+          qLines.push(lines[i]!.replace(/^>\s?/, ''))
+        } else {
+          let peek = i + 1
+          while (peek < lines.length && lines[peek]!.trim() === '') peek++
+          if (peek < lines.length && lines[peek]!.startsWith('>')) {
+            qLines.push('')
+          } else {
+            break
+          }
+        }
+        i++
+      }
+      blocks.push({ type: 'quote', blocks: parseBlocks(qLines.join('\n')) })
+      continue
+    }
+
+    // Ordered list
+    if (/^\d+\.\s/.test(line)) {
+      const items: MdListItem[] = []
+      while (i < lines.length && /^\d+\.\s/.test(lines[i]!)) {
+        const text = lines[i]!.replace(/^\d+\.\s/, '')
+        const { checked, content } = extractTaskCheck(text)
+        const itemLines: string[] = [content]
+        i++
+        while (i < lines.length && lines[i]!.startsWith('  ') && !/^\d+\.\s/.test(lines[i]!)) {
+          itemLines.push(lines[i]!.slice(2))
+          i++
+        }
+        items.push({ blocks: parseBlocks(itemLines.join('\n')), checked })
+      }
+      blocks.push({ type: 'list', ordered: true, items })
+      continue
+    }
+
+    // Unordered list
+    if (/^[-*]\s/.test(line)) {
+      const items: MdListItem[] = []
+      while (i < lines.length && (/^[-*]\s/.test(lines[i]!) || (lines[i]!.startsWith('  ') && items.length > 0))) {
+        if (/^[-*]\s/.test(lines[i]!)) {
+          const text = lines[i]!.replace(/^[-*]\s/, '')
+          const { checked, content } = extractTaskCheck(text)
+          const itemLines: string[] = [content]
+          i++
+          while (i < lines.length && lines[i]!.startsWith('  ') && !/^[-*]\s/.test(lines[i]!.trim())) {
+            itemLines.push(lines[i]!.slice(2))
+            i++
+          }
+          items.push({ blocks: parseBlocks(itemLines.join('\n')), checked })
+        } else {
+          if (items.length > 0) {
+            const lastItem = items[items.length - 1]!
+            const sub = parseBlocks(lines[i]!.slice(2))
+            lastItem.blocks.push(...sub)
+          }
+          i++
+        }
+      }
+      blocks.push({ type: 'list', ordered: false, items })
+      continue
+    }
+
+    // (tables, images — added in Task 4)
 
     // Paragraph — collect until blank line or block-level start
     const pLines: string[] = []

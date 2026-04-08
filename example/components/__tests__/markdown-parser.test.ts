@@ -141,3 +141,86 @@ describe('parseMarkdown — basic blocks', () => {
     expect(result[3]!.type).toBe('rule')
   })
 })
+
+describe('parseMarkdown — blockquotes', () => {
+  test('simple blockquote', () => {
+    const result = parseMarkdown('> hello world')
+    expect(result[0]).toMatchObject({
+      type: 'quote',
+      blocks: [{ type: 'paragraph', spans: [{ t: 'text', v: 'hello world' }] }],
+    })
+  })
+
+  test('multi-line blockquote', () => {
+    const result = parseMarkdown('> line one\n> line two')
+    expect(result[0]!.type).toBe('quote')
+    expect((result[0] as any).blocks[0].spans[0].v).toBe('line one line two')
+  })
+
+  test('nested blockquote', () => {
+    const result = parseMarkdown('> > nested')
+    expect(result[0]!.type).toBe('quote')
+    expect((result[0] as any).blocks[0].type).toBe('quote')
+  })
+
+  test('blockquote with multiple paragraphs', () => {
+    const result = parseMarkdown('> para one\n>\n> para two')
+    expect(result[0]!.type).toBe('quote')
+    expect((result[0] as any).blocks).toHaveLength(2)
+  })
+})
+
+describe('parseMarkdown — unordered lists', () => {
+  test('simple list', () => {
+    const result = parseMarkdown('- one\n- two\n- three')
+    expect(result[0]).toMatchObject({ type: 'list', ordered: false })
+    expect((result[0] as any).items).toHaveLength(3)
+  })
+
+  test('nested list', () => {
+    const result = parseMarkdown('- parent\n  - child')
+    expect(result[0]!.type).toBe('list')
+    const items = (result[0] as any).items
+    expect(items).toHaveLength(1)
+    expect(items[0].blocks).toHaveLength(2) // paragraph + nested list
+  })
+
+  test('list with inline formatting', () => {
+    const result = parseMarkdown('- **bold** item')
+    const items = (result[0] as any).items
+    expect(items[0].blocks[0].spans).toEqual([
+      { t: 'bold', v: 'bold' },
+      { t: 'text', v: ' item' },
+    ])
+  })
+})
+
+describe('parseMarkdown — ordered lists', () => {
+  test('simple ordered list', () => {
+    const result = parseMarkdown('1. first\n2. second')
+    expect(result[0]).toMatchObject({ type: 'list', ordered: true })
+    expect((result[0] as any).items).toHaveLength(2)
+  })
+})
+
+describe('parseMarkdown — task lists', () => {
+  test('unchecked task', () => {
+    const result = parseMarkdown('- [ ] todo item')
+    const item = (result[0] as any).items[0]
+    expect(item.checked).toBe(false)
+  })
+
+  test('checked task', () => {
+    const result = parseMarkdown('- [x] done item')
+    const item = (result[0] as any).items[0]
+    expect(item.checked).toBe(true)
+  })
+
+  test('mixed task list', () => {
+    const result = parseMarkdown('- [x] done\n- [ ] todo\n- normal')
+    const items = (result[0] as any).items
+    expect(items[0].checked).toBe(true)
+    expect(items[1].checked).toBe(false)
+    expect(items[2].checked).toBeUndefined()
+  })
+})

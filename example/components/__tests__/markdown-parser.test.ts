@@ -224,3 +224,46 @@ describe('parseMarkdown — task lists', () => {
     expect(items[2].checked).toBeUndefined()
   })
 })
+
+describe('parseMarkdown — tables', () => {
+  test('simple table', () => {
+    const md = '| Name | Age |\n| --- | --- |\n| Alice | 30 |\n| Bob | 25 |'
+    const result = parseMarkdown(md)
+    expect(result[0]!.type).toBe('table')
+    const table = result[0] as any
+    expect(table.headers).toHaveLength(2)
+    expect(table.headers[0][0]).toMatchObject({ t: 'text', v: 'Name' })
+    expect(table.headers[1][0]).toMatchObject({ t: 'text', v: 'Age' })
+    expect(table.rows).toHaveLength(2)
+    expect(table.rows[0][0][0]).toMatchObject({ t: 'text', v: 'Alice' })
+    expect(table.rows[1][1][0]).toMatchObject({ t: 'text', v: '25' })
+  })
+
+  test('table with inline formatting', () => {
+    const md = '| **Bold** | `code` |\n| --- | --- |\n| data | data |'
+    const result = parseMarkdown(md)
+    const table = result[0] as any
+    expect(table.headers[0][0]).toMatchObject({ t: 'bold', v: 'Bold' })
+    expect(table.headers[1][0]).toMatchObject({ t: 'code', v: 'code' })
+  })
+})
+
+describe('parseMarkdown — images', () => {
+  test('image placeholder', () => {
+    const result = parseMarkdown('![diagram](https://example.com/img.png)')
+    expect(result[0]).toEqual({
+      type: 'image',
+      alt: 'diagram',
+      url: 'https://example.com/img.png',
+    })
+  })
+
+  test('image between paragraphs', () => {
+    const md = 'text before\n\n![pic](url)\n\ntext after'
+    const result = parseMarkdown(md)
+    expect(result).toHaveLength(3)
+    expect(result[0]!.type).toBe('paragraph')
+    expect(result[1]!.type).toBe('image')
+    expect(result[2]!.type).toBe('paragraph')
+  })
+})

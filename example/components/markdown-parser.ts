@@ -149,7 +149,26 @@ function parseBlocks(md: string): MdBlock[] {
       continue
     }
 
-    // (tables, images — added in Task 4)
+    // Table
+    if (/^\|/.test(line) && i + 1 < lines.length && /^\|[\s-:|]+\|$/.test(lines[i + 1]!.trim())) {
+      const headerCells = parseTableRow(line)
+      i += 2 // skip header + separator
+      const rows: MdSpan[][][] = []
+      while (i < lines.length && /^\|/.test(lines[i]!)) {
+        rows.push(parseTableRow(lines[i]!))
+        i++
+      }
+      blocks.push({ type: 'table', headers: headerCells, rows })
+      continue
+    }
+
+    // Image (standalone line)
+    const imgMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
+    if (imgMatch) {
+      blocks.push({ type: 'image', alt: imgMatch[1] || '', url: imgMatch[2]! })
+      i++
+      continue
+    }
 
     // Paragraph — collect until blank line or block-level start
     const pLines: string[] = []
@@ -166,6 +185,13 @@ function parseBlocks(md: string): MdBlock[] {
   }
 
   return blocks
+}
+
+function parseTableRow(line: string): MdSpan[][] {
+  return line
+    .replace(/^\||\|$/g, '')
+    .split('|')
+    .map(cell => parseSpans(cell.trim()))
 }
 
 // ─── Inline span parser ──────────────────────────────────

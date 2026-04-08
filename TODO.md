@@ -16,6 +16,8 @@ All fixes address O(n^2) → O(n) regressions on long texts. Critical for AI cha
 - [ ] Restore cached prefix fits — `line-break.ts` [chenglou/pretext@2ff48ab8]
 - [ ] Defer punctuation materialization — `analysis.ts` [chenglou/pretext@2148b904]
 - [ ] Arabic no-space merges linear — `analysis.ts` [chenglou/pretext@4cb8b244]
+- [ ] Make prepare worst-case scans linear — `analysis.ts` + `layout.ts` [chenglou/pretext@f0a326d0]
+- [ ] Deduplicate isCJK test, remove no-op pre-wrap replace — `analysis.ts` [chenglou/pretext@8823e3d7]
 
 ### Core test coverage
 

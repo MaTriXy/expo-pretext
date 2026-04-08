@@ -3,9 +3,9 @@ import { analyzeText, type AnalysisProfile } from './analysis'
 import {
   buildPreparedText,
   buildPreparedTextWithSegments,
-  layout,
   type PrepareOptions as LayoutPrepareOptions,
-} from './layout'
+} from './build'
+import { layout } from './layout'
 import { cacheNativeResult, clearJSCache } from './cache'
 import { textStyleToFontDescriptor, getFontKey, getLineHeight, warnIfFontNotLoaded } from './font-utils'
 import { getEngineProfile } from './engine-profile'

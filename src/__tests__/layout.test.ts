@@ -7,9 +7,8 @@
 // that prepare() uses when the native module is unavailable.
 
 import { describe, test, expect } from 'bun:test'
+import { buildPreparedText, buildPreparedTextWithSegments } from '../build'
 import {
-  buildPreparedText,
-  buildPreparedTextWithSegments,
   layout,
   layoutWithLines,
   walkLineRanges,

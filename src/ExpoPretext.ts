@@ -1,8 +1,10 @@
 // src/ExpoPretext.ts
 // JS binding to the native Expo module.
-// All native calls go through this file.
+// On web: uses Canvas + Intl.Segmenter backend.
+// On native: uses iOS/Android Expo module.
 
 import { NativeModule, requireNativeModule } from 'expo-modules-core'
+import { Platform } from 'react-native'
 import type { FontDescriptor, NativeSegmentResult } from './types'
 
 type MeasureNativeOptions = {
@@ -10,7 +12,7 @@ type MeasureNativeOptions = {
   locale?: string
 }
 
-interface ExpoPretextNativeModule extends InstanceType<typeof NativeModule> {
+export interface ExpoPretextNativeModule extends InstanceType<typeof NativeModule> {
   segmentAndMeasure(
     text: string,
     font: FontDescriptor,
@@ -51,20 +53,39 @@ interface ExpoPretextNativeModule extends InstanceType<typeof NativeModule> {
   setNativeCacheSize(size: number): void
 }
 
-let nativeModule: ExpoPretextNativeModule | null = null
+let cachedModule: ExpoPretextNativeModule | null | undefined = undefined
+
+function getWebBackend(): ExpoPretextNativeModule {
+  const { createWebBackend } = require('./web-backend') as typeof import('./web-backend')
+  return createWebBackend() as unknown as ExpoPretextNativeModule
+}
 
 export function getNativeModule(): ExpoPretextNativeModule | null {
-  if (nativeModule !== null) return nativeModule
+  if (cachedModule !== undefined) return cachedModule
+
+  // Web: use Canvas + Intl.Segmenter backend
+  if (Platform.OS === 'web') {
+    try {
+      cachedModule = getWebBackend()
+      return cachedModule
+    } catch {
+      cachedModule = null
+      return null
+    }
+  }
+
+  // Native: use Expo module
   try {
-    nativeModule = requireNativeModule<ExpoPretextNativeModule>('ExpoPretext')
-    return nativeModule
+    cachedModule = requireNativeModule<ExpoPretextNativeModule>('ExpoPretext')
+    return cachedModule
   } catch {
-    if (__DEV__) {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
       console.warn(
         '[expo-pretext] Native module not available. ' +
         'Using JS estimates. Use a development build for accurate measurements.'
       )
     }
+    cachedModule = null
     return null
   }
 }

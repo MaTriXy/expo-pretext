@@ -72,5 +72,11 @@ export { buildTextMorph } from './morphing'
 export type { MorphLine, TextMorphResult } from './morphing'
 export { useTextMorphing } from './hooks/useTextMorphing'
 
+// --- Animated (requires react-native-reanimated) ---
+export { useAnimatedTextHeight } from './hooks/useAnimatedTextHeight'
+export type { HeightAnimationConfig } from './hooks/useAnimatedTextHeight'
+export { useCollapsibleHeight } from './hooks/useCollapsibleHeight'
+export type { CollapsibleHeightResult } from './hooks/useCollapsibleHeight'
+
 // --- Utilities ---
 export { clearCache, setLocale } from './layout'

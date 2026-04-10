@@ -11,6 +11,7 @@ import { buildPreparedText, buildPreparedTextWithSegments } from '../build'
 import {
   layout,
   layoutWithLines,
+  layoutNextLine,
   walkLineRanges,
   measureNaturalWidth,
 } from '../layout'
@@ -297,4 +298,40 @@ describe('prepare() fallback edge cases', () => {
     const p = makePrepared(arabic)
     expect(layout(p, 300).lineCount).toBeGreaterThanOrEqual(1)
   })
+})
+
+// ---------------------------------------------------------------------------
+// layoutNextLine vs layoutWithLines consistency (upstream #121 triage)
+// ---------------------------------------------------------------------------
+
+describe('layoutNextLine vs layoutWithLines consistency (upstream #121 triage)', () => {
+  const texts = [
+    'The quick brown fox jumps over the lazy dog near the riverbank on a sunny afternoon',
+    'Short text',
+    'One\ntwo\nthree',
+    'A single very long word: supercalifragilisticexpialidocious and more text after it',
+  ]
+  const maxWidths = [80, 120, 200, 50]
+
+  for (const text of texts) {
+    for (const maxWidth of maxWidths) {
+      test(`"${text.slice(0, 20)}..." at width=${maxWidth}`, () => {
+        const prepared = makePreparedWithSegments(text, STYLE)
+        const withLines = layoutWithLines(prepared, maxWidth)
+        const manualLines: Array<{ text: string; width: number }> = []
+        let cursor = { segmentIndex: 0, graphemeIndex: 0 }
+        let line = layoutNextLine(prepared, cursor, maxWidth)
+        while (line !== null) {
+          manualLines.push({ text: line.text, width: line.width })
+          cursor = line.end
+          line = layoutNextLine(prepared, cursor, maxWidth)
+        }
+        expect(manualLines.length).toBe(withLines.lineCount)
+        for (let i = 0; i < manualLines.length; i++) {
+          expect(manualLines[i]!.text).toBe(withLines.lines[i]!.text)
+          expect(manualLines[i]!.width).toBeCloseTo(withLines.lines[i]!.width, 5)
+        }
+      })
+    }
+  }
 })

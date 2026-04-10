@@ -95,3 +95,78 @@ describe('typewriter with streaming text', () => {
     }
   })
 })
+
+describe('typewriter edge cases', () => {
+  test('single character text', () => {
+    const text = 'A'
+    const prepared = prepareWithSegments(text, STYLE)
+    const result = layoutWithLines(prepared, 200)
+    const frames = buildTypewriterFrames(result.lines, text, 24)
+    expect(frames.length).toBe(1)
+    expect(frames[0]!.revealedText).toBe('A')
+    expect(frames[0]!.isComplete).toBe(true)
+    expect(frames[0]!.lineCount).toBe(1)
+  })
+
+  test('text with newlines', () => {
+    const text = 'Line1\nLine2\nLine3'
+    const prepared = prepareWithSegments(text, STYLE)
+    const result = layoutWithLines(prepared, 200)
+    const frames = buildTypewriterFrames(result.lines, text, 24)
+    expect(frames.length).toBe(text.length)
+    const lastFrame = frames[frames.length - 1]!
+    expect(lastFrame.revealedText).toBe(text)
+    expect(lastFrame.isComplete).toBe(true)
+  })
+
+  test('whitespace-only text', () => {
+    const text = '   '
+    const prepared = prepareWithSegments(text, STYLE)
+    const result = layoutWithLines(prepared, 200)
+    const frames = buildTypewriterFrames(result.lines, text, 24)
+    // Whitespace-only text produces no layout lines, so no frames
+    expect(frames.length).toBe(0)
+  })
+
+  test('unicode text (emoji)', () => {
+    const text = 'Hello 🌍 World'
+    const prepared = prepareWithSegments(text, STYLE)
+    const result = layoutWithLines(prepared, 200)
+    const frames = buildTypewriterFrames(result.lines, text, 24)
+    expect(frames.length).toBe(text.length)
+    const lastFrame = frames[frames.length - 1]!
+    expect(lastFrame.revealedText).toBe(text)
+    expect(lastFrame.isComplete).toBe(true)
+  })
+
+  test('CJK text', () => {
+    const text = '你好世界测试'
+    const prepared = prepareWithSegments(text, STYLE)
+    const result = layoutWithLines(prepared, 200)
+    const frames = buildTypewriterFrames(result.lines, text, 24)
+    expect(frames.length).toBe(6)
+    expect(frames[0]!.revealedText).toBe('你')
+    expect(frames[5]!.revealedText).toBe('你好世界测试')
+  })
+
+  test('very narrow width forces many lines', () => {
+    const text = 'ABCDEF'
+    const prepared = prepareWithSegments(text, STYLE)
+    const result = layoutWithLines(prepared, 20)
+    const frames = buildTypewriterFrames(result.lines, text, 24)
+    expect(frames.length).toBe(6)
+    const lastFrame = frames[frames.length - 1]!
+    expect(lastFrame.height).toBe(result.lineCount * 24)
+  })
+
+  test('different lineHeight values', () => {
+    const text = 'Hello World'
+    const prepared = prepareWithSegments(text, STYLE)
+    const result = layoutWithLines(prepared, 200)
+    const frames16 = buildTypewriterFrames(result.lines, text, 16)
+    const frames32 = buildTypewriterFrames(result.lines, text, 32)
+    expect(frames16.length).toBe(frames32.length)
+    expect(frames16[0]!.height).toBe(16)
+    expect(frames32[0]!.height).toBe(32)
+  })
+})

@@ -65,5 +65,10 @@ export type { TypewriterFrame } from './typewriter'
 export { useTypewriterLayout } from './hooks/useTypewriterLayout'
 export type { TypewriterLayoutResult } from './hooks/useTypewriterLayout'
 
+// --- Text Morphing ---
+export { buildTextMorph } from './morphing'
+export type { MorphLine, TextMorphResult } from './morphing'
+export { useTextMorphing } from './hooks/useTextMorphing'
+
 // --- Utilities ---
 export { clearCache, setLocale } from './layout'

@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView } from 'react-native'
-import { prepare, layout, prepareWithSegments, walkLineRanges } from 'expo-pretext'
+import { prepare, layout, prepareWithSegments } from 'expo-pretext'
 
 const style = { fontFamily: 'Helvetica Neue', fontSize: 16, lineHeight: 24 }
 const maxBubbleWidth = 280

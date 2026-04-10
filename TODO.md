@@ -25,56 +25,98 @@
 
 ---
 
-## P2 Remaining — v0.7.0
+## Tier 1: AI Chat Experience — v0.6.1–v0.6.2
 
-### Animation & interactive layout
+> Primary use case. AI chat apps need these immediately.
 
-- [ ] **useAnimatedTextHeight** — Reanimated integration. Smooth height transitions for streaming, edit, expand/collapse.
-- [ ] **useObstacleLayout hook** — Promote Editorial Engine pattern to reusable hook. Drag obstacle → text reflows at 60fps.
-- [ ] **Collapsible sections** — Pre-compute heights for expanded + collapsed states. Animate between them.
-- [ ] **Pinch-to-zoom text** — fontSize changes per gesture frame. layout() at 0.0002ms = 120+ layouts per frame.
+### v0.6.1 — Upstream JS triage + Typewriter effect
 
-### Developer experience
+- [ ] Triage upstream #120 (rich-inline CJK overflow) — check if exists in our `rich-inline.ts`
+- [ ] Triage upstream #121 (layoutNextLine mismatch) — check against our `layout.ts`
+- [ ] Triage upstream #119 (skip no-op merges) — check against our `analysis.ts`
+- [ ] Triage upstream #105 (currency symbol line-break) — check against our `analysis.ts`
+- [ ] **Typewriter effect** — `useTypewriterLayout` hook. Token-by-token reveal with pre-calculated line wrapping. Extends `useStreamingLayout` + `layoutWithLines()`.
+
+### v0.6.2 — Code block height prediction
+
+- [ ] **Code block syntax-aware height** — `measureCodeBlockHeight()` utility. Monospace font + `whiteSpace: 'pre-wrap'` + optional language-aware break rules. First: investigate if `prepare()` with monospace style already works.
+
+---
+
+## Tier 2: Flagship Demos — v0.6.3–v0.6.5 → v0.7.0
+
+> Community demand. Wow factor and adoption drivers.
+
+### v0.6.3 — useObstacleLayout hook + Text morphing
+
+- [ ] **useObstacleLayout hook** — Promote `layoutColumn()` to React hook with memoization + optional Gesture Handler drag. `layoutColumn()` is 100% functional (193 lines), hook wraps it.
+- [ ] **Text morphing** — `useTextMorphing` hook. Animate line-by-line from "Thinking..." to final response. Uses `layoutWithLines()` for both states, interpolates between line sets.
+
+### v0.6.4 — useAnimatedTextHeight + Collapsible sections
+
+- [ ] **useAnimatedTextHeight** — Reanimated `SharedValue<number>` wrapping `layout()`. Smooth height transitions. New optional peer dep: `react-native-reanimated`.
+- [ ] **Collapsible sections** — `useCollapsibleHeight` hook. Pre-compute expanded + collapsed heights, animate between with Reanimated.
+
+### v0.6.5 — Pinch-to-zoom text
+
+- [ ] **Pinch-to-zoom text** — `usePinchToZoomText` hook. fontSize changes per gesture frame. layout() at 0.0002ms = 120+ layouts per frame. First on React Native (web equivalent `pinch-type` has 104 stars).
+
+### v0.7.0 — Animation & AI Suite Release
+
+- [ ] Version bump, README update, CHANGELOG, demo app updates
+
+---
+
+## Tier 3: Production Readiness — v0.7.1–v0.7.3
+
+> Real-world app requirements for App Store / Play Store shipping.
+
+### v0.7.1 — Dynamic Type / Accessibility
+
+- [ ] **Dynamic Type / Accessibility** — `PixelRatio.getFontScale()` listener + `clearCache()` + auto re-prepare. WCAG compliance. `pretext-a11y` exists in ecosystem.
+
+### v0.7.2 — iOS/Android reconciliation + native investigation
+
+- [ ] **iOS/Android reconciliation** — consistent-height mode across platforms. Merges: Android `TextPaint.breakText()` investigation + iOS `NSLayoutManager` tradeoffs. Goal: cross-platform normalization via `engine-profile.ts`.
+
+### v0.7.3 — Font metrics API
+
+- [ ] **Font metrics API** — ascender, descender, x-height, cap-height from native (iOS UIFont + Android Paint.FontMetrics). Web fallback via Canvas `measureText()`.
+
+---
+
+## Tier 4: DX & Optimization — v0.7.4 → v0.8.0
+
+> Developer experience for adopters.
+
+### v0.7.4 — Developer tools
 
 - [ ] **Debug overlay** — `<PretextDebugOverlay>` showing predicted vs actual heights, cache hit/miss, timing
 - [ ] **Snapshot testing** — `expectHeightSnapshot(texts, style, width)` for CI regression detection
 - [ ] **Performance budget** — `prepare(text, style, { budgetMs: 5 })` — estimate fallback if native exceeds budget
 
-### Engine improvements
+### v0.8.0 — Production Ready Release
 
-- [ ] Android: investigate `TextPaint.breakText()` for more accurate line-break prediction
-- [ ] iOS: explore `NSLayoutManager` vs `NSString.size` tradeoffs
-- [ ] Hermes `Intl.Segmenter` — lightweight C++ fallback if spread-operator grapheme splitting bottlenecks
-- [ ] Profile and optimize `prepare()` batch throughput (native-bound, 15ms/500 texts)
-
-### Native API additions
-
-- [ ] **Font metrics API** — ascender, descender, x-height, cap-height from native (iOS UIFont + Android Paint.FontMetrics)
+- [ ] Full audit, version bump, documentation update
 
 ---
 
-## P3 — v1.0+ (long-term vision)
+## Tier 5: Engine Optimization — v0.8.x
 
-### Camera & AR integration
+- [ ] Profile and optimize `prepare()` batch throughput (native-bound, 15ms/500 texts)
+- [ ] Hermes `Intl.Segmenter` — lightweight C++ fallback if spread-operator grapheme splitting bottlenecks
+- [ ] iPad split-screen / foldable — optimized relayout batch on frequent width changes
 
-- [ ] **Object detection labels** — ML detects objects, text labels avoid overlapping via obstacle layout
-- [ ] **Live translation overlay** — OCR → translate → fit in same bounding box
-- [ ] **AR text annotations** — text bubbles in 3D scene, obstacle layout prevents overlap
-- [ ] **AI live video analysis** — streaming commentary overlay on camera feed
-- [ ] **Smart subtitle positioning** — face detection → obstacles, subtitles flow around faces
+---
 
-### Advanced streaming
+## Excluded (application-layer, not library)
 
-- [ ] **Typewriter effect** — token-by-token reveal with pre-calculated line wrapping
-- [ ] **Text morphing** — animate line-by-line from "Thinking..." to final response
-- [ ] **Text-around-video** — inline video, text flows around, video resizes with instant reflow
-- [ ] **Code block syntax-aware height** — monospace with syntax highlighting wrapping
-
-### Platform
-
-- [ ] **iOS/Android reconciliation** — consistent-height mode across platforms
-- [ ] **Dynamic Type / Accessibility** — detect system font scale changes, auto-invalidate caches
-- [ ] **iPad split-screen / foldable** — optimized relayout batch on frequent width changes
+- ~~Object detection labels~~ — ML model integration, not text layout
+- ~~Live translation overlay~~ — OCR + translation, not text layout
+- ~~AR text annotations~~ — 3D scene management, not text layout
+- ~~AI live video analysis~~ — video processing, not text layout
+- ~~Smart subtitle positioning~~ — face detection is external; obstacle layout already supports rect obstacles
+- ~~Text-around-video~~ — niche; obstacle layout already handles rect obstacles
 
 ---
 
@@ -85,6 +127,8 @@
 - AI chat demo = primary dogfood. Editorial demos = rich line API dogfood.
 - Native measurement = ground truth. JS fallback = safety net.
 - Keep layout() allocation-light. prepare() is the bottleneck.
+- Never blindly port upstream web fixes — our native backends differ fundamentally.
+- Each task: analyze code → implement → audit → test → verify → commit → next.
 
 ## Not worth doing
 
@@ -100,7 +144,8 @@
 
 - Whether prepareStreaming should carry forward line-break state
 - Whether whiteSpace: 'pre-wrap' should handle configurable tab stops
-- Whether obstacle layout should support arbitrary shapes
+- Whether obstacle layout should support arbitrary shapes (upstream #99)
 - Whether measureNaturalWidth should extend to rich inline flow
 - Whether a validateFont utility should be exported
 - Whether a diagnostic verify mode (JS vs native comparison) is worth having
+- Whether typewriter and morphing hooks need a shared animation primitive

@@ -56,8 +56,8 @@ export type {
 export { prepareStreaming, clearStreamingState } from './streaming'
 
 // --- Text Utilities ---
-export { fitFontSize, truncateText } from './text-utils'
-export type { TruncationResult } from './text-utils'
+export { fitFontSize, truncateText, measureCodeBlockHeight } from './text-utils'
+export type { TruncationResult, CodeBlockMeasurement } from './text-utils'
 
 // --- Typewriter ---
 export { buildTypewriterFrames } from './typewriter'

@@ -89,3 +89,65 @@ export function truncateText(
     lineCount: maxLines,
   }
 }
+
+/**
+ * Measure the height of a code block with monospace font.
+ *
+ * Uses `whiteSpace: 'pre-wrap'` mode to preserve newlines, indentation,
+ * and trailing spaces — matching how code is displayed in AI chat apps,
+ * editors, and terminal UIs.
+ *
+ * Tabs are expanded at 8-space intervals (CSS `tab-size: 8` semantics).
+ *
+ * @param code - The source code text (newlines and whitespace preserved)
+ * @param style - Text style (use a monospace fontFamily like 'Menlo', 'Courier', etc.)
+ * @param maxWidth - Container width in pixels
+ * @returns Height in pixels, line count, and whether the code was truncated
+ *
+ * @example
+ * ```ts
+ * import { measureCodeBlockHeight } from 'expo-pretext'
+ *
+ * const { height, lineCount } = measureCodeBlockHeight(
+ *   'function hello() {\n  console.log("world")\n}',
+ *   { fontFamily: 'Menlo', fontSize: 14, lineHeight: 20 },
+ *   containerWidth,
+ * )
+ * ```
+ *
+ * @example
+ * ```tsx
+ * // In a FlashList AI chat — measure mixed prose + code blocks
+ * function measureMessageHeight(message: Message, width: number): number {
+ *   let totalHeight = 0
+ *   for (const block of message.blocks) {
+ *     if (block.type === 'code') {
+ *       totalHeight += measureCodeBlockHeight(
+ *         block.content, codeStyle, width - codePadding,
+ *       ).height
+ *     } else {
+ *       totalHeight += layout(prepare(block.content, proseStyle), width).height
+ *     }
+ *   }
+ *   return totalHeight
+ * }
+ * ```
+ */
+export type CodeBlockMeasurement = {
+  /** Total height in pixels */
+  height: number
+  /** Number of lines (including empty lines from newlines) */
+  lineCount: number
+}
+
+export function measureCodeBlockHeight(
+  code: string,
+  style: TextStyle,
+  maxWidth: number,
+): CodeBlockMeasurement {
+  if (!code || maxWidth <= 0) return { height: 0, lineCount: 0 }
+
+  const prepared = prepare(code, style, { whiteSpace: 'pre-wrap' })
+  const result = layout(prepared, maxWidth)
+  return { height: result.height, lineCount: result.lineCount }
+}

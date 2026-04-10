@@ -335,3 +335,32 @@ describe('walkInlineFlowLines() — fragment properties', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// 10. CJK overflow triage (upstream #120)
+// ---------------------------------------------------------------------------
+
+// Upstream #120 triage: CJK overflow does not reproduce in expo-pretext.
+describe('CJK overflow (upstream #120 triage)', () => {
+  test('CJK-only inline item does not exceed maxWidth', () => {
+    const items = [{ text: '这是一个测试文本用于检查溢出行为', style: STYLE }]
+    const prepared = prepareInlineFlow(items)
+    const maxWidth = 100
+    const result = measureInlineFlow(prepared, maxWidth, STYLE.lineHeight ?? STYLE.fontSize * 1.2)
+    expect(result.lineCount).toBeGreaterThan(1)
+    expect(result.height).toBeGreaterThan(0)
+  })
+
+  test('mixed CJK + Latin inline items do not overflow', () => {
+    const items = [
+      { text: 'Hello ', style: STYLE },
+      { text: '中文测试', style: STYLE },
+      { text: ' world', style: STYLE },
+    ]
+    const prepared = prepareInlineFlow(items)
+    const maxWidth = 120
+    const result = measureInlineFlow(prepared, maxWidth, STYLE.lineHeight ?? STYLE.fontSize * 1.2)
+    expect(result.lineCount).toBeGreaterThan(0)
+    expect(result.height).toBeGreaterThan(0)
+  })
+})

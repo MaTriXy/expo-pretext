@@ -4,6 +4,9 @@ import { mock } from 'bun:test'
 
 mock.module('react-native', () => ({
   Platform: { OS: 'ios', select: (obj: Record<string, unknown>) => obj.ios ?? obj.default },
+  PixelRatio: { getFontScale: () => 1.0 },
+  AccessibilityInfo: { addEventListener: () => ({ remove: () => {} }) },
+  Dimensions: { addEventListener: () => ({ remove: () => {} }) },
   NativeModules: {},
   NativeEventEmitter: class {},
 }))

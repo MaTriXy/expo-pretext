@@ -84,5 +84,8 @@ export type { CollapsibleHeightResult } from './hooks/useCollapsibleHeight'
 export { usePinchToZoomText } from './hooks/usePinchToZoomText'
 export type { PinchToZoomResult } from './hooks/usePinchToZoomText'
 
+// --- Accessibility ---
+export { getFontScale, onFontScaleChange, clearAllCaches } from './accessibility'
+
 // --- Utilities ---
 export { clearCache, setLocale } from './layout'

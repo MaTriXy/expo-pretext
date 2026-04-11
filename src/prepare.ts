@@ -70,7 +70,7 @@ function flushPending(): void {
     group.push(item)
   }
 
-  for (const [, group] of groups) {
+  for (const [fontKey, group] of groups) {
     const font = textStyleToFontDescriptor(group[0]!.style)
     const opts = group[0]!.options
     const nativeOpts = opts
@@ -83,7 +83,6 @@ function flushPending(): void {
         font,
         nativeOpts
       )
-      const fontKey = getFontKey(group[0]!.style)
       for (let i = 0; i < group.length; i++) {
         const result = results[i]!
         cacheNativeResult(fontKey, result.segments, result.widths)
@@ -176,13 +175,12 @@ export function prepare(
   options?: PrepareOptions
 ): PreparedText {
   warnIfFontNotLoaded(style)
+  const profile = getAnalysisProfile()
   if (!text) {
-    const profile = getAnalysisProfile()
     const analysis = analyzeText([], [], profile, options?.whiteSpace)
     return buildPreparedText(analysis, new Map(), style, toLayoutOptions(options))
   }
   const result = segmentAndMeasureWithCache(text, style, options)
-  const profile = getAnalysisProfile()
   const analysis = analyzeText(
     result.segments,
     result.isWordLike,
@@ -204,13 +202,12 @@ export function prepareWithSegments(
   options?: PrepareOptions
 ): PreparedTextWithSegments {
   warnIfFontNotLoaded(style)
+  const profile = getAnalysisProfile()
   if (!text) {
-    const profile = getAnalysisProfile()
     const analysis = analyzeText([], [], profile, options?.whiteSpace)
     return buildPreparedTextWithSegments(analysis, new Map(), style, toLayoutOptions(options))
   }
   const result = segmentAndMeasureWithCache(text, style, options)
-  const profile = getAnalysisProfile()
   const analysis = analyzeText(
     result.segments,
     result.isWordLike,
@@ -231,6 +228,8 @@ export function measureHeights(
   style: TextStyle,
   maxWidth: number
 ): number[] {
+  if (texts.length === 0) return []
+
   const native = getNativeModule()
   if (!native) {
     return texts.map(t => {
@@ -239,14 +238,27 @@ export function measureHeights(
     })
   }
 
-  // Primary: TextKit for pixel-perfect height
+  // Pre-warm JS cache with one batched native call for segmentation.
+  // This populates the width cache so subsequent prepare() calls are cache hits.
+  try {
+    const font = textStyleToFontDescriptor(style)
+    const fontKey = getFontKey(style)
+    const batchResults = native.batchSegmentAndMeasure(texts, font)
+    for (const result of batchResults) {
+      cacheNativeResult(fontKey, result.segments, result.widths)
+    }
+  } catch {
+    // If batch fails, fall through to per-item
+  }
+
+  // Primary: TextKit for pixel-perfect height (now with warm cache)
   const font = textStyleToFontDescriptor(style)
   const lh = getLineHeight(style)
   return texts.map(text => {
     try {
       return native.measureTextHeight(text, font, maxWidth, lh).height
     } catch {
-      // Fallback to segment-based
+      // Fallback to segment-based — benefits from pre-warmed cache
       const p = prepare(text, style)
       return layout(p, maxWidth).height
     }

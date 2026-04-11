@@ -37,22 +37,22 @@ type Umbrella = {
   handleH: number
 }
 
-// Is a given (x, y) point inside the umbrella body (canopy OR handle)?
-// Using the circular/elliptical canopy and rectangular handle.
-function pointInUmbrella(x: number, y: number, u: Umbrella): boolean {
+// Is a given (x, y) point inside the umbrella's rain-blocking region?
+// The region is: canopy (upper ellipse) + full shadow column below the canopy
+// all the way to the bottom of the stage. This matches the upstream pretextjs.dev
+// umbrella demo where the umbrella casts a full shadow that blocks all rain below.
+function pointInUmbrellaShadow(x: number, y: number, u: Umbrella, stageBottom: number): boolean {
   // Canopy: upper half of an ellipse (cy is the flat bottom of the canopy)
   if (y <= u.cy) {
     const dx = (x - u.cx) / u.rx
     const dy = (y - u.cy) / u.ry
     if (dx * dx + dy * dy <= 1) return true
+    return false
   }
-  // Handle: thin rectangle hanging from canopy center
-  const handleLeft = u.cx - u.handleW / 2
-  const handleRight = u.cx + u.handleW / 2
-  const handleTop = u.cy
-  const handleBottom = u.cy + u.handleH
-  if (x >= handleLeft && x <= handleRight && y >= handleTop && y <= handleBottom) {
-    return true
+  // Below canopy: entire shadow column from canopy bottom to stage bottom
+  // Shadow width equals canopy width (2 * rx)
+  if (y > u.cy && y <= stageBottom) {
+    if (x >= u.cx - u.rx && x <= u.cx + u.rx) return true
   }
   return false
 }
@@ -147,7 +147,7 @@ export function UmbrellaReflowDemo() {
         const y = s.head - i * LH
         if (y < 0 || y > stageH) continue
         // Check umbrella collision — skip if occluded
-        if (pointInUmbrella(s.x + cellWidth / 2, y + LH / 2, umbrella)) continue
+        if (pointInUmbrellaShadow(s.x + cellWidth / 2, y + LH / 2, umbrella, stageH)) continue
         // Brightness fades from head (1.0) to tail (0.2)
         const brightness = i === 0 ? 1 : Math.max(0.15, 1 - i / s.length)
         out.push({

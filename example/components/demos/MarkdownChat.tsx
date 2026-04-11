@@ -331,7 +331,7 @@ export function MarkdownChatDemo() {
   const { width } = useWindowDimensions()
   const laneWidth = width - 32
   const userMax = Math.floor(laneWidth * BUBBLE_MAX_RATIO)
-  const assistantMax = laneWidth
+  const assistantMax = Math.floor(laneWidth * BUBBLE_MAX_RATIO)
 
   const textStyle = { fontFamily: 'System', fontSize: 16, lineHeight: 24 }
 
@@ -369,11 +369,11 @@ export function MarkdownChatDemo() {
 
 // ─── Styles ───────────────────────────────────────────────
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f7f7f8' },
+  container: { flex: 1, backgroundColor: '#ebebed' },
   infoBanner: {
     paddingVertical: 6,
     paddingHorizontal: 16,
-    backgroundColor: '#eee',
+    backgroundColor: '#dcdce0',
   },
   infoText: {
     fontSize: 11,
@@ -397,6 +397,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: BUBBLE_PAD_Y,
     marginBottom: 8,
+    marginHorizontal: 16,
     alignSelf: 'flex-start',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
   },
 })

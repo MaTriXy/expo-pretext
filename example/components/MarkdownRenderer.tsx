@@ -147,8 +147,8 @@ const RenderBlock = memo(function RenderBlock({
     case 'heading': {
       const style =
         block.level === 1 ? { fontFamily: 'Georgia', fontSize: 20, lineHeight: 28, fontWeight: '700' as const } :
-        block.level === 2 ? { fontFamily: 'Georgia', fontSize: 17, lineHeight: 25, fontWeight: '700' as const } :
-        { fontSize: 15, lineHeight: 22, fontWeight: '700' as const }
+          block.level === 2 ? { fontFamily: 'Georgia', fontSize: 17, lineHeight: 25, fontWeight: '700' as const } :
+            { fontSize: 15, lineHeight: 22, fontWeight: '700' as const }
       return (
         <Text style={[style, { color: theme.headingColor }]}>
           {block.spans.map((span, i) => {

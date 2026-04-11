@@ -6,6 +6,14 @@ Predict text heights **before rendering** — no `onLayout`, no layout jumps, no
 
 **Production-ready in v0.8.0** — 381 tests, 17 new APIs since v0.6.0, full animation suite, accessibility support, cross-platform reconciliation, and developer tools.
 
+<p align="center">
+  <img src="https://github.com/JubaKitiashvili/expo-pretext/raw/main/assets/demos/hero.gif" width="720" alt="expo-pretext demo reel" />
+</p>
+
+<p align="center">
+  <img src="https://github.com/JubaKitiashvili/expo-pretext/raw/main/assets/demos/hero-reel.gif" width="720" alt="expo-pretext creative demos reel" />
+</p>
+
 ## Demos
 
 <table>

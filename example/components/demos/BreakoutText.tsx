@@ -97,10 +97,17 @@ export function BreakoutTextDemo() {
   const pan = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (e) => {
-      const lx = e.nativeEvent.locationX
+    onPanResponderGrant: (e) => {
+      // Use absolute pageX to avoid locationX oscillating between nested hit targets
+      // (bricks, ball, paddle). Subtract the arena's left offset (container padding).
+      const lx = e.nativeEvent.pageX - CONTAINER_PADDING
       setPaddle(p => ({ ...p, x: Math.max(ARENA_PAD, Math.min(stageW - p.w - ARENA_PAD, lx - p.w / 2)) }))
     },
+    onPanResponderMove: (_e, gestureState) => {
+      const lx = gestureState.moveX - CONTAINER_PADDING
+      setPaddle(p => ({ ...p, x: Math.max(ARENA_PAD, Math.min(stageW - p.w - ARENA_PAD, lx - p.w / 2)) }))
+    },
+    onPanResponderTerminationRequest: () => false,
   }), [stageW])
 
   useEffect(() => {

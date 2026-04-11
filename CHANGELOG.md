@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.3 — 2026-04-11
+
+### Docs
+
+- README: two hero demo reels (720w @ 30fps) replacing the old three-up
+  thumbnail grid — one full AI-chat demo, one creative demos reel.
+- MarkdownChat example: white assistant bubble on a slightly darker
+  page background, user bubbles capped at `laneWidth * 0.78`, container
+  sizing matches the `userMax` constraint for both roles.
+- Rewrote the production-ready tagline to drop the internal version
+  comparison and lead with concrete capabilities.
+
+No library changes — ship `expo-pretext@0.8.3` only if you want the
+updated README and example app.
+
 ## 0.8.2 — 2026-04-11
 
 ### Example app polish (no library changes)

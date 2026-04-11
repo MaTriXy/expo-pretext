@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { View, Text, StyleSheet, useWindowDimensions, PanResponder, Pressable } from 'react-native'
+import { View, Text, StyleSheet, useWindowDimensions, PanResponder, Pressable, ScrollView } from 'react-native'
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { runOnJS } from 'react-native-reanimated'
 import Animated, { useAnimatedStyle } from 'react-native-reanimated'
@@ -78,9 +78,15 @@ export function PinchToZoomDemo() {
       <Pressable onPress={cycleZoom}>
         <GestureDetector gesture={pinchGesture}>
           <Animated.View style={styles.bubble}>
-            <Animated.Text style={[styles.bubbleText, textStyle]}>
-              {SAMPLE_TEXT}
-            </Animated.Text>
+            <ScrollView
+              style={styles.bubbleScroll}
+              contentContainerStyle={styles.bubbleScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              <Animated.Text style={[styles.bubbleText, textStyle]}>
+                {SAMPLE_TEXT}
+              </Animated.Text>
+            </ScrollView>
           </Animated.View>
         </GestureDetector>
       </Pressable>
@@ -139,9 +145,16 @@ const styles = StyleSheet.create({
   bubble: {
     backgroundColor: '#1a1a1e',
     borderRadius: 16,
-    padding: 16,
     borderWidth: 1,
     borderColor: '#2a2a32',
+    height: 280, // fixed height — content scrolls internally when zoomed
+    overflow: 'hidden',
+  },
+  bubbleScroll: {
+    flex: 1,
+  },
+  bubbleScrollContent: {
+    padding: 16,
   },
   bubbleText: {
     fontFamily: 'Helvetica Neue',

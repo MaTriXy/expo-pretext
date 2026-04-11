@@ -18,4 +18,7 @@ config.resolver.nodeModulesPaths = [
 // Prevent duplicate React
 config.resolver.disableHierarchicalLookup = true
 
+// Enable package.json "exports" field for subpath imports (e.g., expo-pretext/animated)
+config.resolver.unstable_enablePackageExports = true
+
 module.exports = config

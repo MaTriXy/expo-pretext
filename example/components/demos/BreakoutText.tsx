@@ -5,9 +5,17 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { View, Text, StyleSheet, useWindowDimensions, PanResponder, Pressable } from 'react-native'
-import { prepareWithSegments, measureNaturalWidth } from 'expo-pretext'
+import {
+  prepareWithSegments,
+  measureNaturalWidth,
+  layoutColumn,
+  type CircleObstacle,
+  type RectObstacle,
+} from 'expo-pretext'
 
 const BRICK_STYLE = { fontFamily: 'Menlo', fontSize: 13, lineHeight: 20 }
+const PROSE_STYLE = { fontFamily: 'Menlo', fontSize: 10, lineHeight: 14 }
+const PROSE_LH = 14
 
 // Meaningful sentence — each word becomes a brick
 const SENTENCE = 'PRETEXT TURNS MOTION INTO LANGUAGE AND LETS EVERY MEASURED WORD SWING INTO PLACE WHILE YOU BREAK THE APART'
@@ -23,8 +31,10 @@ const BRICK_COLORS = [
   '#c44e5a', // red
 ]
 
-// Background prose text — fills the arena behind the bricks for texture
-const BG_PROSE = `The layout engine measures every segment once then lays out lines in pure arithmetic no reflows no DOM reads no thrashing The ball is a cursor the bricks are words and the words are geometry When a word breaks its measured width returns to the pool When the paddle catches a power word the rules shift for a moment slow motion multi ball wider guard The sentence at the top of the arena describes a philosophy once you measure the text with the same engine that renders it you stop fighting the browser and start choreographing it `.repeat(5)
+// Background prose text — reflows around the ball and bricks via layoutColumn().
+// This is the core dogfood of expo-pretext: obstacle layout at 60fps with a
+// moving circular obstacle (the ball) carving a hole in real text.
+const BG_PROSE = `The layout engine measures every segment once then lays out lines in pure arithmetic no reflows no DOM reads no thrashing The ball is a cursor the bricks are words and the words are geometry When a word breaks its measured width returns to the pool When the paddle catches a power word the rules shift for a moment slow motion multi ball wider guard The sentence at the top of the arena describes a philosophy once you measure the text with the same engine that renders it you stop fighting the browser and start choreographing it Pretext prepares once and layouts many times The native TextKit measurement is pixel accurate The JavaScript line break algorithm runs in microseconds The ball traces a path through words and prose and the text simply flows around it `.repeat(4)
 
 const CONTAINER_PADDING = 16
 const ARENA_PAD = 12
@@ -49,6 +59,10 @@ export function BreakoutTextDemo() {
   const BRICK_H = 26
   const BRICK_V_GAP = 4
   const BRICK_H_GAP = 6
+
+  // Prepare the background prose once — it gets re-laid-out every frame as
+  // the ball moves. This is the whole point of the demo.
+  const preparedProse = useMemo(() => prepareWithSegments(BG_PROSE, PROSE_STYLE), [])
 
   // Build bricks once per width
   const initialBricks = useMemo<Brick[]>(() => {
@@ -188,6 +202,31 @@ export function BreakoutTextDemo() {
 
   const aliveCount = bricks.filter(b => b.alive).length
 
+  // Compute background prose reflowed around the ball, live bricks, and paddle.
+  // This runs on every frame (because ball/paddle state updates every ~16ms).
+  // layoutColumn() is pure arithmetic at ~0.0002ms per line — no reflow, no jank.
+  const proseLines = useMemo(() => {
+    const circles: CircleObstacle[] = [
+      { cx: ball.x, cy: ball.y, r: ball.r + 6, hPad: 4, vPad: 2 },
+    ]
+    const rects: RectObstacle[] = [
+      // Live bricks as obstacles
+      ...bricks.filter(b => b.alive).map(b => ({
+        x: b.x, y: b.y, w: b.w, h: b.h,
+      })),
+      // Paddle as obstacle
+      { x: paddle.x, y: paddle.y, w: paddle.w, h: paddle.h },
+    ]
+    return layoutColumn(
+      preparedProse,
+      { segmentIndex: 0, graphemeIndex: 0 },
+      { x: ARENA_PAD, y: ARENA_PAD, width: stageW - ARENA_PAD * 2, height: arenaH - ARENA_PAD * 2 },
+      PROSE_LH,
+      circles,
+      rects,
+    ).lines
+  }, [preparedProse, ball, bricks, paddle, stageW, arenaH])
+
   const reset = useCallback(() => {
     setBricks(initialBricks)
     setScore(0)
@@ -243,8 +282,20 @@ export function BreakoutTextDemo() {
 
       {/* Arena */}
       <View {...pan.panHandlers} style={[styles.arena, { width: stageW, height: arenaH }]}>
-        {/* Background prose — subtle texture */}
-        <Text style={styles.prose} numberOfLines={30}>{BG_PROSE}</Text>
+        {/* Background prose — reflows around ball + bricks + paddle via layoutColumn() */}
+        {proseLines.map((line, i) => (
+          <Text
+            key={`${i}-${line.x}-${line.y}`}
+            style={[styles.proseLine, {
+              left: line.x,
+              top: line.y,
+              width: line.width,
+            }]}
+            numberOfLines={1}
+          >
+            {line.text}
+          </Text>
+        ))}
 
         {/* Word bricks */}
         {bricks.map(br => br.alive && (
@@ -438,16 +489,14 @@ const styles = StyleSheet.create({
     marginTop: 12,
     alignSelf: 'center',
   },
-  prose: {
+  proseLine: {
     position: 'absolute',
-    left: ARENA_PAD,
-    right: ARENA_PAD,
-    top: ARENA_PAD,
-    bottom: ARENA_PAD,
+    height: PROSE_LH,
     fontFamily: 'Menlo',
-    fontSize: 9,
-    lineHeight: 13,
-    color: 'rgba(100, 140, 110, 0.16)',
+    fontSize: 10,
+    lineHeight: PROSE_LH,
+    color: 'rgba(120, 170, 130, 0.32)',
+    overflow: 'hidden',
   },
   brickText: {
     fontFamily: 'Menlo',

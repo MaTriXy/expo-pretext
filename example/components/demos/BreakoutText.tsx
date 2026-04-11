@@ -1,13 +1,13 @@
 // PRETEXT BREAKER — arcade-style breakout game where bricks are words.
 // Inspired by the pretextjs.dev Pretext Breaker demo.
 // Each brick's width = natural width of its word at the game font (measureNaturalWidth).
-// Words are laid out in sentence order with color cycling. Background shows dense prose.
+// Polished UI matching the PinchToZoom design language.
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { View, Text, StyleSheet, useWindowDimensions, PanResponder, Pressable } from 'react-native'
 import { prepareWithSegments, measureNaturalWidth } from 'expo-pretext'
 
-const BRICK_STYLE = { fontFamily: 'Menlo', fontSize: 14, lineHeight: 20 }
+const BRICK_STYLE = { fontFamily: 'Menlo', fontSize: 13, lineHeight: 20 }
 
 // Meaningful sentence — each word becomes a brick
 const SENTENCE = 'PRETEXT TURNS MOTION INTO LANGUAGE AND LETS EVERY MEASURED WORD SWING INTO PLACE WHILE YOU BREAK THE APART'
@@ -24,7 +24,10 @@ const BRICK_COLORS = [
 ]
 
 // Background prose text — fills the arena behind the bricks for texture
-const BG_PROSE = `The layout engine measures every segment once, then lays out lines in pure arithmetic. No reflows, no DOM reads, no thrashing. The ball is a cursor, the bricks are words, and the words are geometry. When a word breaks, its measured width returns to the pool. When the paddle catches a power word, the rules shift for a moment — slow motion, multi ball, wider guard. The sentence at the top of the arena describes a philosophy: once you measure the text with the same engine that renders it, you stop fighting the browser and start choreographing it. `.repeat(6)
+const BG_PROSE = `The layout engine measures every segment once then lays out lines in pure arithmetic no reflows no DOM reads no thrashing The ball is a cursor the bricks are words and the words are geometry When a word breaks its measured width returns to the pool When the paddle catches a power word the rules shift for a moment slow motion multi ball wider guard The sentence at the top of the arena describes a philosophy once you measure the text with the same engine that renders it you stop fighting the browser and start choreographing it `.repeat(5)
+
+const CONTAINER_PADDING = 16
+const ARENA_PAD = 12
 
 type Brick = {
   id: number
@@ -41,13 +44,11 @@ type Ball = { x: number; y: number; vx: number; vy: number; r: number }
 
 export function BreakoutTextDemo() {
   const { width } = useWindowDimensions()
-  const stageW = width
-  const stageH = 640
-  const HEADER_H = 72
-  const ARENA_TOP = HEADER_H
-  const ARENA_BOT = stageH - 44
-  const PAD = 10
+  const stageW = width - CONTAINER_PADDING * 2
+  const arenaH = 420
   const BRICK_H = 26
+  const BRICK_V_GAP = 4
+  const BRICK_H_GAP = 6
 
   // Build bricks once per width
   const initialBricks = useMemo<Brick[]>(() => {
@@ -57,13 +58,13 @@ export function BreakoutTextDemo() {
       return measureNaturalWidth(prepared) + 18 // padding inside the brick
     })
 
-    let x = PAD
-    let y = ARENA_TOP + 12
+    let x = ARENA_PAD
+    let y = ARENA_PAD
     for (let i = 0; i < WORDS.length; i++) {
       const w = widths[i]!
-      if (x + w > stageW - PAD) {
-        x = PAD
-        y += BRICK_H + 4
+      if (x + w > stageW - ARENA_PAD) {
+        x = ARENA_PAD
+        y += BRICK_H + BRICK_V_GAP
       }
       list.push({
         id: i,
@@ -72,7 +73,7 @@ export function BreakoutTextDemo() {
         color: BRICK_COLORS[i % BRICK_COLORS.length]!,
         alive: true,
       })
-      x += w + 6
+      x += w + BRICK_H_GAP
     }
     return list
   }, [stageW])
@@ -81,25 +82,29 @@ export function BreakoutTextDemo() {
   const [score, setScore] = useState(0)
   const [lives, setLives] = useState(3)
   const [level] = useState(1)
+  const [gameState, setGameState] = useState<'running' | 'gameover' | 'won'>('running')
 
-  const [paddle, setPaddle] = useState({ x: stageW / 2 - 50, y: ARENA_BOT - 18, w: 100, h: 10 })
+  // Paddle & ball use arena-local coordinates (0..stageW horizontally, 0..arenaH vertically)
+  const [paddle, setPaddle] = useState({ x: stageW / 2 - 50, y: arenaH - 22, w: 100, h: 10 })
   const paddleRef = useRef(paddle)
   paddleRef.current = paddle
 
-  const [ball, setBall] = useState<Ball>({ x: stageW / 2, y: ARENA_BOT - 40, vx: 2.6, vy: -2.6, r: 6 })
+  const [ball, setBall] = useState<Ball>({ x: stageW / 2, y: arenaH - 60, vx: 2.6, vy: -2.6, r: 6 })
 
   const [powerLabel, setPowerLabel] = useState<string | null>(null)
   const powerExpiresRef = useRef(0)
 
   const pan = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderMove: (e) => {
       const lx = e.nativeEvent.locationX
-      setPaddle(p => ({ ...p, x: Math.max(PAD, Math.min(stageW - p.w - PAD, lx - p.w / 2)) }))
+      setPaddle(p => ({ ...p, x: Math.max(ARENA_PAD, Math.min(stageW - p.w - ARENA_PAD, lx - p.w / 2)) }))
     },
   }), [stageW])
 
   useEffect(() => {
+    if (gameState !== 'running') return
     const timer = setInterval(() => {
       if (powerExpiresRef.current && Date.now() > powerExpiresRef.current) {
         powerExpiresRef.current = 0
@@ -113,10 +118,12 @@ export function BreakoutTextDemo() {
         x += vx * slow
         y += vy * slow
 
-        if (x - r < 0) { x = r; vx = -vx }
-        if (x + r > stageW) { x = stageW - r; vx = -vx }
-        if (y - r < ARENA_TOP) { y = ARENA_TOP + r; vy = -vy }
+        // Wall collisions (arena bounds)
+        if (x - r < ARENA_PAD) { x = ARENA_PAD + r; vx = -vx }
+        if (x + r > stageW - ARENA_PAD) { x = stageW - ARENA_PAD - r; vx = -vx }
+        if (y - r < ARENA_PAD) { y = ARENA_PAD + r; vy = -vy }
 
+        // Paddle collision
         const p = paddleRef.current
         if (y + r >= p.y && y + r <= p.y + p.h + 6 && x >= p.x && x <= p.x + p.w && vy > 0) {
           vy = -Math.abs(vy)
@@ -124,11 +131,17 @@ export function BreakoutTextDemo() {
           vx = rel * 3.5
         }
 
-        if (y > stageH) {
-          setLives(l => Math.max(0, l - 1))
-          return { x: stageW / 2, y: ARENA_BOT - 40, vx: 2.6, vy: -2.6, r }
+        // Ball below arena → lose life
+        if (y > arenaH) {
+          setLives(l => {
+            const next = Math.max(0, l - 1)
+            if (next === 0) setGameState('gameover')
+            return next
+          })
+          return { x: stageW / 2, y: arenaH - 60, vx: 2.6, vy: -2.6, r }
         }
 
+        // Brick collisions
         setBricks(prev => {
           let changed = false
           const next = prev.map(br => {
@@ -139,7 +152,7 @@ export function BreakoutTextDemo() {
             ) {
               changed = true
               vy = -vy
-              if (Math.random() < 0.15) {
+              if (Math.random() < 0.18) {
                 const powers = ['SLOW', 'MULTI', 'EXPAND'] as const
                 const power = powers[Math.floor(Math.random() * powers.length)]!
                 setPowerLabel(power)
@@ -153,7 +166,10 @@ export function BreakoutTextDemo() {
             }
             return br
           })
-          if (changed) setScore(s => s + 60 + level * 10)
+          if (changed) {
+            setScore(s => s + 60 + level * 10)
+            if (next.every(b => !b.alive)) setGameState('won')
+          }
           return changed ? next : prev
         })
 
@@ -161,57 +177,80 @@ export function BreakoutTextDemo() {
       })
     }, 16)
     return () => clearInterval(timer)
-  }, [stageW, stageH, level, powerLabel, ARENA_TOP, ARENA_BOT])
+  }, [stageW, arenaH, level, powerLabel, gameState])
 
   const aliveCount = bricks.filter(b => b.alive).length
 
-  const reset = () => {
+  const reset = useCallback(() => {
     setBricks(initialBricks)
     setScore(0)
     setLives(3)
-    setBall({ x: stageW / 2, y: ARENA_BOT - 40, vx: 2.6, vy: -2.6, r: 6 })
+    setBall({ x: stageW / 2, y: arenaH - 60, vx: 2.6, vy: -2.6, r: 6 })
+    setPaddle({ x: stageW / 2 - 50, y: arenaH - 22, w: 100, h: 10 })
     setPowerLabel(null)
     powerExpiresRef.current = 0
-  }
+    setGameState('running')
+  }, [initialBricks, stageW, arenaH])
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
+      {/* Top header card */}
+      <View style={styles.headerCard}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>PRETEXT BREAKER</Text>
-          <Pressable onPress={reset} style={styles.resetBtn}>
-            <Text style={styles.resetText}>RESET</Text>
-          </Pressable>
+          <View style={styles.livePill}>
+            <View style={[styles.liveDot, gameState !== 'running' && styles.liveDotPaused]} />
+            <Text style={styles.liveText}>
+              {gameState === 'running' ? 'LIVE' : gameState === 'won' ? 'WON' : 'OVER'}
+            </Text>
+          </View>
         </View>
-        <View style={styles.statsRow}>
-          <Text style={styles.statKey}>SCORE</Text>
-          <Text style={styles.statVal}>{String(score).padStart(5, '0')}</Text>
-          <Text style={styles.statKey}>LIVES</Text>
-          <Text style={styles.statVal}>{'♥'.repeat(lives)}</Text>
-          <Text style={styles.statKey}>LEVEL</Text>
-          <Text style={styles.statVal}>{String(level).padStart(2, '0')}</Text>
+
+        {/* Metrics grid — matches PinchToZoom style */}
+        <View style={styles.metricsGrid}>
+          <View style={styles.metricCell}>
+            <Text style={styles.metricLabel}>SCORE</Text>
+            <Text style={styles.metricValue}>{String(score).padStart(4, '0')}</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metricCell}>
+            <Text style={styles.metricLabel}>LIVES</Text>
+            <Text style={styles.metricValue}>{'♥'.repeat(lives) || '—'}</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metricCell}>
+            <Text style={styles.metricLabel}>LEVEL</Text>
+            <Text style={styles.metricValue}>{String(level).padStart(2, '0')}</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metricCell}>
+            <Text style={styles.metricLabel}>LEFT</Text>
+            <Text style={styles.metricValue}>{aliveCount}</Text>
+          </View>
         </View>
+
         <Text style={styles.instructions}>
-          Break {aliveCount} words. Drag the paddle to aim, catch power words.
+          Drag anywhere in the arena to move the paddle. Break every word.
         </Text>
       </View>
 
       {/* Arena */}
-      <View {...pan.panHandlers} style={[styles.arena, { width: stageW, height: ARENA_BOT - ARENA_TOP + 28 }]}>
-        <Text style={styles.prose} numberOfLines={40}>{BG_PROSE}</Text>
+      <View {...pan.panHandlers} style={[styles.arena, { width: stageW, height: arenaH }]}>
+        {/* Background prose — subtle texture */}
+        <Text style={styles.prose} numberOfLines={30}>{BG_PROSE}</Text>
 
+        {/* Word bricks */}
         {bricks.map(br => br.alive && (
           <View key={br.id} style={{
             position: 'absolute',
             left: br.x,
-            top: br.y - ARENA_TOP,
+            top: br.y,
             width: br.w,
             height: br.h,
             backgroundColor: br.color,
-            borderRadius: 2,
+            borderRadius: 4,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.3)',
+            borderColor: 'rgba(255,255,255,0.25)',
             justifyContent: 'center',
             alignItems: 'center',
           }}>
@@ -219,113 +258,287 @@ export function BreakoutTextDemo() {
           </View>
         ))}
 
+        {/* Ball */}
         <View style={{
           position: 'absolute',
           left: ball.x - ball.r,
-          top: ball.y - ball.r - ARENA_TOP,
+          top: ball.y - ball.r,
           width: ball.r * 2,
           height: ball.r * 2,
           borderRadius: ball.r,
           backgroundColor: '#ffe066',
           shadowColor: '#ffe066',
+          shadowOpacity: 0.8,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 0 },
+        }} />
+
+        {/* Paddle */}
+        <View style={{
+          position: 'absolute',
+          left: paddle.x,
+          top: paddle.y,
+          width: paddle.w,
+          height: paddle.h,
+          backgroundColor: '#ffd369',
+          borderRadius: 4,
+          shadowColor: '#ffd369',
           shadowOpacity: 0.6,
           shadowRadius: 6,
           shadowOffset: { width: 0, height: 0 },
         }} />
 
-        <View style={{
-          position: 'absolute',
-          left: paddle.x,
-          top: paddle.y - ARENA_TOP,
-          width: paddle.w,
-          height: paddle.h,
-          backgroundColor: '#e8e4dc',
-          borderRadius: 2,
-          borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.5)',
-        }} />
-
+        {/* Power badge */}
         {powerLabel && (
           <View style={styles.powerBadge}>
-            <Text style={styles.powerText}>{powerLabel} 5s</Text>
+            <Text style={styles.powerText}>⚡ {powerLabel}</Text>
+          </View>
+        )}
+
+        {/* Game over / won overlay */}
+        {gameState !== 'running' && (
+          <View style={styles.overlay}>
+            <Text style={styles.overlayTitle}>
+              {gameState === 'won' ? '🎉 YOU WIN' : 'GAME OVER'}
+            </Text>
+            <Text style={styles.overlayScore}>Score {String(score).padStart(4, '0')}</Text>
+            <Pressable onPress={reset} style={styles.overlayBtn}>
+              <Text style={styles.overlayBtnText}>PLAY AGAIN</Text>
+            </Pressable>
           </View>
         )}
       </View>
 
-      <Text style={styles.footerText}>
-        measureNaturalWidth() · word brick widths = real measured text widths
-      </Text>
+      {/* Bottom action bar */}
+      <View style={styles.actionBar}>
+        <Text style={styles.footerText}>
+          measureNaturalWidth() · brick widths = real text widths
+        </Text>
+        <Pressable onPress={reset} style={styles.resetBtn}>
+          <Text style={styles.resetBtnText}>RESET</Text>
+        </Pressable>
+      </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0a0c' },
-  header: {
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1f2130',
+  container: {
+    flex: 1,
     backgroundColor: '#0a0a0c',
+    paddingHorizontal: CONTAINER_PADDING,
+    paddingTop: CONTAINER_PADDING,
   },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  // Header card
+  headerCard: {
+    backgroundColor: '#1a1a22',
+    borderWidth: 1,
+    borderColor: 'rgba(255,211,105,0.18)',
+    borderRadius: 14,
+    padding: 14,
+    shadowColor: '#ffd369',
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   title: {
     fontFamily: 'Menlo',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#ffd369',
     letterSpacing: 2,
   },
-  statsRow: { flexDirection: 'row', marginTop: 6, gap: 6, alignItems: 'baseline' },
-  statKey: { fontFamily: 'Menlo', fontSize: 9, color: 'rgba(255,255,255,0.5)' },
-  statVal: { fontFamily: 'Menlo', fontSize: 11, color: '#e8e4dc', marginRight: 8 },
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(74,158,93,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(74,158,93,0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4a9e5d',
+  },
+  liveDotPaused: {
+    backgroundColor: '#c44e5a',
+  },
+  liveText: {
+    fontFamily: 'Menlo',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#6dd184',
+    letterSpacing: 1,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f0f14',
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  metricCell: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  metricDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  metricLabel: {
+    fontFamily: 'Menlo',
+    fontSize: 9,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.5)',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  metricValue: {
+    fontFamily: 'Menlo',
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#ffd369',
+    letterSpacing: -0.3,
+  },
   instructions: {
     fontFamily: 'Menlo',
     fontSize: 10,
     color: 'rgba(255,255,255,0.45)',
-    marginTop: 4,
+    marginTop: 10,
+    textAlign: 'center',
   },
-  arena: { backgroundColor: '#0f0f14', overflow: 'hidden', position: 'relative' },
+
+  // Arena
+  arena: {
+    backgroundColor: '#0f0f14',
+    borderWidth: 1,
+    borderColor: 'rgba(255,211,105,0.15)',
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginTop: 12,
+    alignSelf: 'center',
+  },
   prose: {
     position: 'absolute',
-    left: 10,
-    right: 10,
-    top: 6,
+    left: ARENA_PAD,
+    right: ARENA_PAD,
+    top: ARENA_PAD,
+    bottom: ARENA_PAD,
     fontFamily: 'Menlo',
     fontSize: 9,
     lineHeight: 13,
-    color: 'rgba(100, 140, 110, 0.2)',
+    color: 'rgba(100, 140, 110, 0.16)',
   },
   brickText: {
     fontFamily: 'Menlo',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#0a0a0c',
     letterSpacing: 0.5,
   },
   powerBadge: {
     position: 'absolute',
-    left: 12,
-    top: 6,
+    right: 12,
+    top: 10,
     backgroundColor: '#ffd369',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    shadowColor: '#ffd369',
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
   },
-  powerText: { fontFamily: 'Menlo', fontSize: 10, fontWeight: '700', color: '#0a0a0c' },
+  powerText: {
+    fontFamily: 'Menlo',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#0a0a0c',
+    letterSpacing: 0.5,
+  },
+
+  // Game over overlay
+  overlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(10,10,12,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  overlayTitle: {
+    fontFamily: 'Menlo',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#ffd369',
+    letterSpacing: 2,
+  },
+  overlayScore: {
+    fontFamily: 'Menlo',
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 1,
+  },
+  overlayBtn: {
+    backgroundColor: '#ffd369',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 999,
+    marginTop: 8,
+    shadowColor: '#ffd369',
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  overlayBtnText: {
+    fontFamily: 'Menlo',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0a0a0c',
+    letterSpacing: 1,
+  },
+
+  // Bottom action bar
+  actionBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 8,
+  },
   footerText: {
     fontFamily: 'Menlo',
     fontSize: 9,
-    color: 'rgba(255,255,255,0.4)',
-    textAlign: 'center',
-    paddingVertical: 10,
+    color: 'rgba(255,255,255,0.3)',
+    flex: 1,
+    letterSpacing: 0.3,
   },
   resetBtn: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,211,105,0.5)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 999,
   },
-  resetText: { fontFamily: 'Menlo', fontSize: 10, fontWeight: '700', color: '#fff', letterSpacing: 1 },
+  resetBtnText: {
+    fontFamily: 'Menlo',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#ffd369',
+    letterSpacing: 1,
+  },
 })

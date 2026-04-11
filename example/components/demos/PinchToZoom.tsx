@@ -13,13 +13,10 @@ const MAX_SCALE = 3.0
 export function PinchToZoomDemo() {
   const { width } = useWindowDimensions()
 
-  // Measured text content width — updated by onLayout on the ScrollView content.
-  // We subtract a small safety margin because native TextKit wraps slightly
-  // tighter than the library's JS line-break prediction (it accounts for
-  // sub-pixel kerning, word-break heuristics, and trailing whitespace differently).
-  const SAFETY_MARGIN = 4
-  const [measuredWidth, setMeasuredWidth] = useState(width - 64)
-  const maxWidth = Math.max(50, measuredWidth - SAFETY_MARGIN)
+  // Fixed text content width: container padding 16 + bubble border 1 +
+  // scrollView padding 16 = 33 per side = 66 total. Using a stable value
+  // avoids an onLayout feedback loop that caused flicker on scale changes.
+  const maxWidth = width - 66
 
   const [scale, setScale] = useState(1)
 
@@ -86,21 +83,11 @@ export function PinchToZoomDemo() {
           style={styles.bubbleScroll}
           contentContainerStyle={styles.bubbleScrollContent}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={false}
+          scrollEnabled={true}
         >
-          <View
-            style={styles.textWrap}
-            onLayout={e => {
-              const w = e.nativeEvent.layout.width
-              if (w > 0 && Math.abs(w - measuredWidth) > 0.5) {
-                setMeasuredWidth(w)
-              }
-            }}
-          >
-            <Animated.Text style={[styles.bubbleText, textStyle]}>
-              {SAMPLE_TEXT}
-            </Animated.Text>
-          </View>
+          <Animated.Text style={[styles.bubbleText, textStyle]}>
+            {SAMPLE_TEXT}
+          </Animated.Text>
         </ScrollView>
       </Pressable>
 
@@ -171,9 +158,6 @@ const styles = StyleSheet.create({
   },
   bubbleScrollContent: {
     padding: 16,
-  },
-  textWrap: {
-    width: '100%',
   },
   bubbleText: {
     fontFamily: 'Helvetica Neue',

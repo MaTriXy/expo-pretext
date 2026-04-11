@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.8.2 — 2026-04-11
+
+### Example app polish (no library changes)
+
+This release is a demo-quality pass on the `example/` app. The library
+itself is unchanged from v0.8.1 — ship `expo-pretext@0.8.2` only if you
+want the updated demo app as a reference.
+
+**New design language across interactive demos:**
+- **Pinch to Zoom** — fixed-height bubble with internal scroll, metrics
+  grid (scale / fontSize / height / lines), interactive slider, tap to
+  cycle discrete zoom levels. Uses `useTextHeight` for native TextKit
+  accuracy instead of JS line-break.
+- **Breakout Text (PRETEXT BREAKER)** — full arcade game: score/lives/
+  level header card, colored word bricks from a meaningful sentence,
+  live prose background that reflows around ball and bricks via
+  `layoutColumn()` at 60fps, rigid-body brick physics (gravity, wall
+  and paddle bounces), power modifiers (SLOW / MULTI / EXPAND), game
+  over overlay.
+- **Text Path** — animated sine curve with per-character rotation along
+  the tangent, HSL color gradient, draggable amplitude slider, wave
+  count cycling, pause/resume.
+- **Umbrella Reflow** — pretty layered umbrella (canopy panels, scalloped
+  tips, wooden handle with grain, J-shaped hook, top knob) casting a
+  full shadow column that blocks the Matrix-style rain at 60fps.
+
+**Bug fixes (all in example app, not library):**
+- Fixed `PanResponder` slider/paddle drag oscillation by using
+  `gestureState.moveX` (absolute page coordinate) instead of
+  `nativeEvent.locationX` which alternates between nested hit targets.
+- Fixed onLayout feedback loops that caused scale-change flicker.
+- Fixed gesture handler conflicts between `Pressable` and
+  `GestureDetector` in the zoom demo.
+
+**Removed:**
+- `Rich Inline Flow` demo removed pending a cleaner API-level solution
+  to library vs RN Text font metric drift on atomic pills.
+
+### Tests
+
+- 386 automated tests (unchanged from v0.8.1)
+
+## 0.8.1 — 2026-04-11
+
+See git log — prepare() batch throughput optimizations.
+
 ## 0.8.0 — 2026-04-11
 
 ### Production Ready Milestone

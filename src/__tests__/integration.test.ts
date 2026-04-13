@@ -37,6 +37,7 @@ import { getFontMetrics } from '../font-utils'
 import { compareDebugMeasurement } from '../debug'
 import { buildHeightSnapshot, compareHeightSnapshots } from '../snapshot'
 import { prepareWithBudget, PrepareBudgetTracker } from '../perf-budget'
+import { measureInkWidth } from '../ink-width'
 
 const STYLE = { fontFamily: 'System', fontSize: 16, lineHeight: 24 }
 const TEXT = 'The quick brown fox jumps over the lazy dog near the river on a sunny day'
@@ -132,6 +133,12 @@ describe('v0.7.x integration — all APIs work together', () => {
     expect(metrics.capHeight).toBeGreaterThan(metrics.xHeight)
   })
 
+  test('ink-bounds width measurement', () => {
+    const w = measureInkWidth(TEXT, STYLE)
+    expect(w).toBeGreaterThan(0)
+    expect(Number.isFinite(w)).toBe(true)
+  })
+
   test('debug measurement comparison', () => {
     const prepared = prepare(TEXT, STYLE)
     const predicted = layout(prepared, 200).height
@@ -160,5 +167,39 @@ describe('v0.7.x integration — all APIs work together', () => {
     tracker.record(result.elapsedMs)
     expect(tracker.sampleCount).toBe(1)
     expect(tracker.averageMs()).toBe(result.elapsedMs)
+  })
+
+  test('getInkSafePadding — italic text', () => {
+    const { getInkSafePadding } = require('../ink-safe') as typeof import('../ink-safe')
+    const style = { fontFamily: 'Georgia', fontSize: 80, fontWeight: 'bold' as const, fontStyle: 'italic' as const }
+    const result = getInkSafePadding('fly', style)
+
+    expect(result.padding.paddingLeft).toBeGreaterThanOrEqual(0)
+    expect(result.padding.paddingRight).toBeGreaterThanOrEqual(0)
+    expect(result.inkWidth).toBeGreaterThanOrEqual(result.advance)
+    expect(Number.isFinite(result.inkWidth)).toBe(true)
+    expect(typeof result.isOvershooting).toBe('boolean')
+  })
+
+  test('getInkSafePadding — non-italic fast path', () => {
+    const { getInkSafePadding } = require('../ink-safe') as typeof import('../ink-safe')
+    const style = { fontFamily: 'System', fontSize: 16 }
+    const result = getInkSafePadding('hello world', style)
+
+    expect(result.padding.paddingLeft).toBe(0)
+    expect(result.padding.paddingRight).toBe(0)
+    expect(result.padding.paddingTop).toBe(0)
+    expect(result.padding.paddingBottom).toBe(0)
+    expect(result.isOvershooting).toBe(false)
+  })
+
+  test('getInkSafePadding — empty string', () => {
+    const { getInkSafePadding } = require('../ink-safe') as typeof import('../ink-safe')
+    const style = { fontFamily: 'Georgia', fontSize: 80, fontStyle: 'italic' as const }
+    const result = getInkSafePadding('', style)
+
+    expect(result.inkWidth).toBe(0)
+    expect(result.advance).toBe(0)
+    expect(result.isOvershooting).toBe(false)
   })
 })
